@@ -16,8 +16,8 @@ Phase 5 公開・まとめ(README、評価結果、全体の振り返り)
 ## 現在地
 
 - [x] Phase 0：コンセプト（`docs/concept.md`）
-- [ ] Phase 1：具体化 ← **次はここ**（ストーリーマップと技術スパイク）
-- [ ] Phase 2：要件化
+- [x] Phase 1：具体化（`docs/story-map.md`、`docs/spikes/`）
+- [ ] Phase 2：要件化 ← **次はここ**
 - [ ] Phase 3：初期設計
 - [ ] Sprint 0：リポジトリ整備
 - [ ] Sprint 1：手動キューの統計と評価スクリプト

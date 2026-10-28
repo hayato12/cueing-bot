@@ -15,6 +15,7 @@
 import csv
 import json
 import random
+import re
 import subprocess
 import sys
 import time
@@ -117,7 +118,7 @@ def separate_one(index: int, out_dir: Path, device: str) -> None:
     from demucs.apply import apply_model
     from demucs.pretrained import get_model
 
-    track = list(csv.DictReader(open(out_dir / "tracks.csv", encoding="utf-8")))[index]
+    track = read_tracks(out_dir)[index]
     t0 = time.perf_counter()
     audio = decode(track["path"])
     t_decode = time.perf_counter() - t0
@@ -160,7 +161,7 @@ def separate_one(index: int, out_dir: Path, device: str) -> None:
 
 def run_all(out_dir: Path, device: str) -> None:
     """1 曲ずつ別プロセスで分離する。macOS の /usr/bin/time -l でピークのメモリも測る。"""
-    n = len(list(csv.DictReader(open(out_dir / "tracks.csv", encoding="utf-8"))))
+    n = len(read_tracks(out_dir))
     for i in range(n):
         proc = subprocess.run(
             ["/usr/bin/time", "-l", sys.executable, __file__, "one", str(out_dir), str(i), device],
@@ -208,8 +209,16 @@ def detect_bar(rms_db: list[float], drop_db: float) -> tuple[int | None, float]:
     return None, ref
 
 
+def read_tracks(out_dir: Path) -> list[dict]:
+    """tracks.csv を読む。表計算アプリで保存すると 1 行目に "tracks" という表題が入ることがあるので、飛ばす。"""
+    f = open(out_dir / "tracks.csv", encoding="utf-8")
+    if not f.readline().startswith("tracks"):
+        f.seek(0)  # 表題がなければ先頭に戻る
+    return list(csv.DictReader(f))
+
+
 def report(out_dir: Path) -> None:
-    tracks = list(csv.DictReader(open(out_dir / "tracks.csv", encoding="utf-8")))
+    tracks = read_tracks(out_dir)
     rows = []
     for i, tr in enumerate(tracks):
         p = out_dir / "results" / f"{i:02d}.json"
@@ -233,7 +242,16 @@ def report(out_dir: Path) -> None:
     for drop in (10, 15, 20):
         hits = sum(1 for r in rows if r[f"bar@{drop}"] is not None and abs(r[f"bar@{drop}"] - r["truth"]) <= 1)
         exact = sum(1 for r in rows if r[f"bar@{drop}"] == r["truth"])
-        print(f"しきい値 -{drop}dB: 一致 {exact}/{len(rows)}、±1 小節以内 {hits}/{len(rows)}")
+        print(f"［手動キューからの推定が正解］しきい値 -{drop}dB: 一致 {exact}/{len(rows)}、±1 小節以内 {hits}/{len(rows)}")
+
+    # オーナーが聴いて決めた正解（merody_a_head 列）があれば、それでも比べる。
+    # セルは「41（改行）メモ」や「3 or 11」のような形なので、1 行目の数字を全部拾い、どれかに入れば当たりとする
+    if "merody_a_head" in tracks[0]:
+        owner = {i: [int(x) for x in re.findall(r"\d+", tr["merody_a_head"].splitlines()[0])] for i, tr in enumerate(tracks)}
+        for drop in (10, 15, 20):
+            hits = sum(1 for r in rows if r[f"bar@{drop}"] is not None
+                       and any(abs(r[f"bar@{drop}"] - b) <= 1 for b in owner[r["i"]]))
+            print(f"［オーナーの正解］しきい値 -{drop}dB: ±1 小節以内 {hits}/{len(rows)}")
 
 
 if __name__ == "__main__":
