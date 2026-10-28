@@ -17,7 +17,7 @@
 ## テスト用の曲
 
 Rekordbox 付属のデモ曲（`~/Music/PioneerDJ/Demo Tracks/`）をコピーして使う。個人の曲を使わずに済み、本番の曲に影響しない。
-コピー先は `~/Music/cueing-bot-spike3/tracks/`（リポジトリの外）。
+コピー先は `~/llm/cueing-bot/data/spike3/tracks/`（リポジトリの外）。最初は `~/Music/cueing-bot-spike3/` に置いていたため、Rekordbox に登録したパスと XML の Location はそちらのまま。`~/Music/cueing-bot-spike3` は新しい場所へのシンボリックリンクにしてある。
 
 | 曲 | 元の曲 | 取り込み前に手で打つキュー | XML に書くキュー | 確かめること |
 |---|---|---|---|---|
