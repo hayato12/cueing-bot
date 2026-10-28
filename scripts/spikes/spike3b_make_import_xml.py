@@ -74,6 +74,15 @@ def main() -> None:
     ET.SubElement(doc, "PRODUCT", {"Name": "cueing-bot-spike3b", "Version": "0.0.0", "Company": ""})
     coll = ET.SubElement(doc, "COLLECTION", {"Entries": str(len(tracks))})
     coll.extend(tracks)  # extend はリストの要素をまとめて子要素に足す
+    # PLAYLISTS がない XML では、Rekordbox の「rekordbox xml」に曲が 1 つも出なかった（2026-10-28。入れたら出た）。
+    # 中身が使われなくても、ROOT のノードとプレイリストを 1 つ入れておく
+    playlists = ET.SubElement(doc, "PLAYLISTS")
+    root_node = ET.SubElement(playlists, "NODE", {"Type": "0", "Name": "ROOT", "Count": "1"})
+    pl = ET.SubElement(
+        root_node, "NODE", {"Name": "spike3b", "Type": "1", "KeyType": "0", "Entries": str(len(tracks))}
+    )
+    for t in tracks:
+        ET.SubElement(pl, "TRACK", {"Key": t.get("TrackID")})
     ET.indent(doc)
     ET.ElementTree(doc).write(sys.argv[2], encoding="UTF-8", xml_declaration=True)
     print("\n".join(log))
