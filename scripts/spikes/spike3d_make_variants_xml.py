@@ -96,7 +96,10 @@ def main() -> None:
     # コレクションにない曲：E の音源をコピーして、E と同じフォルダに置く
     e_loc = re.search(r'Location="([^"]+)"', e).group(1)
     e_file = Path(unquote(e_loc.removeprefix("file://localhost")))
-    playlists = []
+    # 「rekordbox xml」の画面では、どのプレイリストにも入っていない曲は出なかった（2026-10-28）。
+    # E・F・G もプレイリストに入れておく。値は（プレイリスト名、TrackID のリスト）
+    tid = lambda block: re.search(r'TrackID="(\d+)"', block).group(1)  # noqa: E731
+    playlists = [("spike3d-EFG", [tid(t) for t in tracks])]
     for i, key in enumerate(("N1", "N2"), start=1):
         loc = e_loc.replace("spike3-E-multi", f"spike3-{key}-new")
         dst = e_file.with_name(f"spike3-{key}-new.mp3")
@@ -107,13 +110,15 @@ def main() -> None:
         block = re.sub(r'DateAdded="[^"]+"', 'DateAdded="2026-10-28"', block, count=1)
         block = replace_marks(block, [mark(d1(b), "-1", f"r4-{key.lower()}-bar{b}") for b in (9, 25, 41)])
         tracks.append(block)
-        playlists.append((f"spike3d-{key}", f"9000000{i}"))
+        playlists.append((f"spike3d-{key}", [f"9000000{i}"]))
         log.append(f"{key}: 新しい曲 {dst.name}。メモリー {d1(9)}s、{d1(25)}s、{d1(41)}s（すべて Num=-1）")
 
     header = text[: text.index("<COLLECTION")]
     nodes = "".join(
-        f'      <NODE Name="{name}" Type="1" KeyType="0" Entries="1">\n        <TRACK Key="{tid}"/>\n      </NODE>\n'
-        for name, tid in playlists
+        f'      <NODE Name="{name}" Type="1" KeyType="0" Entries="{len(ids)}">\n'
+        + "".join(f'        <TRACK Key="{i}"/>\n' for i in ids)
+        + "      </NODE>\n"
+        for name, ids in playlists
     )
     out = (
         header
