@@ -118,6 +118,7 @@ Web でも探したが、Rekordbox 自身の XML 取り込みでこの現象を�
 
 - [Rekordbox XML Import BUG from Mixed in Key（Pioneer DJ フォーラム）](https://forums.pioneerdj.com/hc/en-us/community/posts/4407777709081-Rekordbox-XML-Import-BUG-from-Mixed-in-Key)：オーナーが見つけたページ。Mac からもクラウドからも開けず（HTTP 403）、中身は未確認
 - [The Rekordbox XML import bug（rekord.cloud）](https://rekord.cloud/blog/the-rekordbox-xml-import-bug)：Mac からは開けなかった（HTTP 404）。別の環境で読んだ要約では「5.6.1 以降、プレイリスト単位の取り込みは、コレクションに既にある曲を更新しない。回避策は曲を選んで個別に Import To Collection」。今回の「メモリーキューが 1 つだけ」とは別の症状に見える
+- [Export cue points to rekordbox（Mixed In Key）](https://mixedinkey.com/workflows/export-cue-points-to-rekordbox/)：Mixed In Key も XML 経由（エクスポートした XML に書き足し、Rekordbox の「rekordbox xml」から取り込む）。メモリーキューとホットキューのどちらを書くか、メモリーキューの数の制限には触れていない。気になる点は「Rekordbox が自動でメモリーキューを付けていたら、上書きの設定を入れる」「BPM の変化点の設定（環境設定 > 詳細 > rekordbox xml）を選ぶ」くらい
 - [CueGen](https://github.com/mganss/cuegen)：キューを自動で打つ既存のツール。XML ではなく master.db に直接書いてメモリーキューを作る。実行中は Rekordbox を閉じる必要があり、実行前に master.db をバックアップする（README より）。XML 取り込みの制限については README に記述なし
 
 ### まだ分からないこと
