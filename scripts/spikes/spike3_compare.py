@@ -11,17 +11,30 @@ import xml.etree.ElementTree as ET
 
 KIND = {-1: "メモリー"} | {i: f"ホット {'ABCDEFGH'[i]}" for i in range(8)}  # | は辞書の結合
 # 曲の情報が消えていないかを見る属性
-WATCH = ("Name", "Artist", "AverageBpm", "TotalTime", "Genre", "Tonality")
+WATCH = ("Name", "Artist", "AverageBpm", "TotalTime", "Genre", "Tonality", "Rating", "Colour")
+
+
+KEYS = "ABCDEFG"  # 1 回目が A〜D、追加実験が E〜G
 
 
 def spike_tracks(path: str) -> dict[str, ET.Element]:
-    """XML からファイル名に spike3-X- を含む曲を {"A": TRACK, ...} で返す。"""
+    """XML からファイル名に spike3-X- を含む曲を {"A": TRACK, ...} で返す。
+
+    TRACK には、その曲が入っているプレイリスト名のリストを ".playlists" という属性で足しておく
+    （プレイリストは TrackID で曲を指すので、TrackID が変わったときに登録が残るかを見るため）
+    """
+    root = ET.parse(path).getroot()
     found = {}
-    for tr in ET.parse(path).getroot().iter("TRACK"):
+    for tr in root.find("COLLECTION"):
         loc = tr.get("Location") or ""
-        for key in "ABCD":
-            if f"spike3-{key}-" in loc and tr.get("TrackID"):
+        for key in KEYS:
+            if f"spike3-{key}-" in loc:
                 found[key] = tr
+    for node in root.iter("NODE"):
+        keys = {t.get("Key") for t in node.findall("TRACK")}  # {...} は集合（Set）
+        for tr in found.values():
+            if tr.get("TrackID") in keys:
+                tr.set(".playlists", (tr.get(".playlists", "") + " " + node.get("Name")).strip())
     return found
 
 
@@ -29,7 +42,8 @@ def describe(tr: ET.Element | None) -> list[str]:
     """1 曲ぶんの情報を、比べやすいように文字列のリストにする。"""
     if tr is None:
         return ["（曲が見つからない）"]
-    lines = [f"{k}={tr.get(k)}" for k in WATCH]
+    lines = [f"{k}={tr.get(k)}" for k in (*WATCH, "TrackID")]
+    lines.append(f"プレイリスト: {tr.get('.playlists') or 'なし'}")
     tempos = tr.findall("TEMPO")
     lines.append(f"TEMPO {len(tempos)} 個" + (f"（先頭 Inizio={tempos[0].get('Inizio')} Bpm={tempos[0].get('Bpm')}）" if tempos else ""))
     marks = sorted(tr.findall("POSITION_MARK"), key=lambda m: (int(m.get("Num")), float(m.get("Start"))))
@@ -44,7 +58,9 @@ def main() -> None:
     if len(paths) < 2:
         raise SystemExit(__doc__)
     snapshots = [spike_tracks(p) for p in paths]
-    for key in "ABCD":
+    for key in KEYS:
+        if not any(key in snap for snap in snapshots):
+            continue
         print(f"=== 曲 {key} ===")
         for path, snap in zip(paths, snapshots):
             print(f"--- {path}")
