@@ -114,6 +114,12 @@ Rekordbox が自分で出力した XML でも同じことが起きたので、**
 取り込みの経路にもよらない。1 回目の B（ダイアログが出ず、曲が入れ直された）も、追加の実験と切り分けの実験（ダイアログで「はい」）も、残ったのは最後のメモリーキュー 1 つだった。
 Web でも探したが、Rekordbox 自身の XML 取り込みでこの現象を説明している情報は見つからなかった。
 
+### 参考
+
+- [Rekordbox XML Import BUG from Mixed in Key（Pioneer DJ フォーラム）](https://forums.pioneerdj.com/hc/en-us/community/posts/4407777709081-Rekordbox-XML-Import-BUG-from-Mixed-in-Key)：オーナーが見つけたページ。Mac からもクラウドからも開けず（HTTP 403）、中身は未確認
+- [The Rekordbox XML import bug（rekord.cloud）](https://rekord.cloud/blog/the-rekordbox-xml-import-bug)：Mac からは開けなかった（HTTP 404）。別の環境で読んだ要約では「5.6.1 以降、プレイリスト単位の取り込みは、コレクションに既にある曲を更新しない。回避策は曲を選んで個別に Import To Collection」。今回の「メモリーキューが 1 つだけ」とは別の症状に見える
+- [CueGen](https://github.com/mganss/cuegen)：キューを自動で打つ既存のツール。XML ではなく master.db に直接書いてメモリーキューを作る。実行中は Rekordbox を閉じる必要があり、実行前に master.db をバックアップする（README より）。XML 取り込みの制限については README に記述なし
+
 ### まだ分からないこと
 
 - 1 回目でダイアログが出なかった理由
@@ -135,4 +141,4 @@ Web でも探したが、Rekordbox 自身の XML 取り込みでこの現象を�
 | 1. ホットキューで出す | メモリーキューにしたい位置も、空いているホットキュー（A〜H）で出す | XML の取り込みだけで済む。複数入ることは確認済み | 8 個まで。今の使い分け（ホット＝メイン、メモリー＝区切り）が崩れる |
 | 2. 1 つはメモリー、残りはホット | 一番大事な 1 つ（例：A メロの頭）だけメモリーキューで出す | 案 1 より今の使い方に近い | どれをメモリーにするかの決めごとが要る |
 | 3. 一覧を見て手で打つ | アプリは位置の一覧（小節番号など）を出すだけにする | ライブラリを一切触らない | 手で打つ時間が残り、目標の 1/3 に届きにくい |
-| 4. DB に直接書く | pyrekordbox などで master.db に書き込む | メモリーキューを好きなだけ書ける | **「DB に書き込まない」という約束（CLAUDE.md）に反する。** 壊れたときの影響が大きい |
+| 4. DB に直接書く | pyrekordbox などで master.db に書き込む（CueGen はこの方式） | メモリーキューを好きなだけ書ける | **「DB に書き込まない」という約束（CLAUDE.md）に反する。** 壊れたときの影響が大きい |
