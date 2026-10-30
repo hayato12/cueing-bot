@@ -82,6 +82,18 @@ python3 scripts/spikes/spike4_inspect_cues.py ~/llm/cueing-bot/data/db/master.db
 2. **キューを書くときは `djmdCue` と `contentCue` をそろえる必要がある。** Rekordbox 自身のデータでは、両者が全曲で一致している。djcues のように `djmdCue` だけを書くと、この一致が崩れる
 3. 書き込みの形は、画面で打ったキュー（`Color` -1、任意の列は NULL）にそろえる。USN は「`contentCue` → 曲の行」の順に 1 ずつ進める。`CueUpdated` も増やす
 
-### 書き込みの試験
+### 書き込みの試験（2026-10-30、本物の master.db）
 
-（未実施）
+オーナーの OK のもと、[scripts/spikes/spike4_write_cues.py](../../scripts/spikes/spike4_write_cues.py) を実行した。事前に Rekordbox の「ライブラリのバックアップ」（zip、音楽ファイルは含めない）を取り、スクリプトも書く直前の master.db 一式を `data/db/backup-20261030-214855/` にコピーした。Rekordbox を終了し、止まっているのを確かめてから書いた。記録は `~/llm/cueing-bot/data/spike4/`（`dryrun.txt`・`write.txt`・`inspect-after.txt`）。
+
+| 曲 | 書く前 | 書いたメモリーキュー |
+|---|---|---|
+| E（Demo Track 1、128 BPM） | メモリー 15.023s（スパイク 3 の 4 回目の取り込み） | 15.023s・45.023s・75.023s（9・25・41 小節目） |
+| F（Demo Track 2、120 BPM） | キューなし | 16.024s・48.024s・80.024s（9・25・41 小節目） |
+
+- エラーなく終わった。書いた後の DB のコピーを読むと、E・F とも `djmdCue` 3 行と `contentCue` の JSON 3 要素が一致。ライブラリ全体でも、`contentCue` と数が合わない曲・欠けている曲は 0
+- `CueUpdated` は E が 9→15、F が 6→10。USN は `contentCue` → 曲の行の順に 1 ずつ進んだ
+- **Rekordbox を起動すると、E・F の波形にメモリーキューが 3 つずつ出た**（オーナーの画面で確認）
+- pyrekordbox が「プレイリスト 5 つが masterPlaylists6.xml にない」と警告した。照合の警告で、プレイリストには書いていない。masterPlaylists6.xml は Rekordbox の終了時に更新されていて、スクリプトのバックアップには入っていない（zip には入っている）
+
+**まだ確かめていないこと**：キューから再生したときの位置、ほかの曲のキューに変化がないか、USB への書き出しと XDJ-RR での呼び出し、M4A・VBR の MP3 の曲
