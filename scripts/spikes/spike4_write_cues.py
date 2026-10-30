@@ -1,17 +1,19 @@
-"""スパイク 4：テスト用の曲だけに、メモリーキューを master.db へ直接書く。
+"""スパイク 4：テスト用の曲だけに、メモリーキュー（とホットキュー）を master.db へ直接書く。
 
 使い方:
     python3 scripts/spikes/spike4_write_cues.py            # 書かずに、書く内容を表示するだけ（既定）
     python3 scripts/spikes/spike4_write_cues.py --execute  # バックアップを取ってから書く
     python3 scripts/spikes/spike4_write_cues.py --target spike4-M4A-demo1  # 対象の曲を変える（ファイル名の一部、複数可）
+    python3 scripts/spikes/spike4_write_cues.py --hot A=33 H=57  # ホットキューも書く（パッド=小節番号）
 
 対象:
     既定ではスパイク 3 のテスト曲（デモ曲のコピー）の E と F だけ。ファイル名で探し、ほかの曲には触れない。
     --target を付けると、その名前を含む曲を対象にする（"spike" を含む名前だけ受け付ける。本番の曲に書かないため）。
-    それぞれのキューを全部消して、メモリーキューを 9・25・41 小節目の 3 つにする。
+    それぞれのキューを全部消して、メモリーキューを 9・25・41 小節目の 3 つにする。--hot を付けると、ホットキューも足す。
 
 書き方（スパイク 4 の下調べで分かった、Rekordbox 自身の書き方にそろえる）:
     - djmdCue：画面で打ったキューと同じ形（Color=-1、任意の列は NULL、InFrame=floor(ms*150/1000)、MPEG の列は 0）
+    - ホットキューは Kind でパッドを表す（A〜C が 1〜3、D〜H が 5〜9。4 は使わない）。色は画面で打ったものと同じく Color=-1
     - contentCue：その曲の全キューの JSON を書き直す（NULL の列はキーごと書かない）
     - djmdContent.CueUpdated を増やし、USN を「contentCue → djmdContent」の順に 1 ずつ進める
 
@@ -34,6 +36,7 @@ from pyrekordbox.db6 import tables
 
 TARGETS = ("spike3-E-multi", "spike3-F-samepos")
 BARS = (9, 25, 41)
+HOT_KIND = {"A": 1, "B": 2, "C": 3, "D": 5, "E": 6, "F": 7, "G": 8, "H": 9}
 BACKUP_ROOT = Path.home() / "llm/cueing-bot/data/db"
 
 
@@ -89,7 +92,14 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--execute", action="store_true", help="実際に書く（指定しなければ表示だけ）")
     parser.add_argument("--target", nargs="+", default=list(TARGETS), help="対象の曲のファイル名の一部")
+    parser.add_argument("--hot", nargs="*", default=[], help="ホットキュー。パッド=小節番号（例：A=33 H=57）")
     args = parser.parse_args()
+    hot = []  # (Kind, 小節番号)
+    for item in args.hot:
+        pad, _, bar = item.partition("=")
+        if pad.upper() not in HOT_KIND or not bar.isdigit():
+            raise SystemExit(f"--hot の書き方が違います: {item}（例：A=33）")
+        hot.append((HOT_KIND[pad.upper()], int(bar)))
     if any("spike" not in t for t in args.target):
         raise SystemExit("--target にはテスト用の曲（名前に spike を含む）だけを指定してください")
 
@@ -103,11 +113,13 @@ def main() -> None:
             raise SystemExit(f"'{target}' の曲が {len(hits)} 曲見つかりました（1 曲のはず）")
         content = hits[0]
         fb = first_beat_ms(db, content)
-        positions = [bar_to_ms(fb, content.BPM / 100, b) for b in BARS]
+        bpm = content.BPM / 100
+        # (Kind, ミリ秒)。Kind 0 がメモリーキュー
+        positions = [(0, bar_to_ms(fb, bpm, b)) for b in BARS] + [(k, bar_to_ms(fb, bpm, b)) for k, b in hot]
         existing = list(db.get_cue(ContentID=content.ID))
         print(f"\n{target}  ID={content.ID}  BPM={content.BPM / 100}  最初の拍={fb:.0f}ms")
         print(f"  消すキュー: {[(c.Kind, c.InMsec) for c in existing]}")
-        print(f"  書くメモリーキュー(ms): {positions}")
+        print(f"  書くキュー (Kind, ms): {positions}")
         plans.append((content, existing, positions))
 
     if not args.execute:
@@ -121,7 +133,7 @@ def main() -> None:
         for cue in existing:
             db.delete(cue)
         new_cues = []
-        for ms in positions:
+        for kind, ms in positions:
             # Rekordbox のキューの ID は 32 ビットの乱数（例：2625852351）。同じ実行の中での重複も避ける
             cue_id = str(db.generate_unused_id(tables.DjmdCue, is_28_bit=False))
             while cue_id in used_ids:
@@ -134,7 +146,7 @@ def main() -> None:
                 UUID=str(uuid4()),
                 InMsec=ms, InFrame=ms * 150 // 1000, InMpegFrame=0, InMpegAbs=0,
                 OutMsec=-1, OutFrame=0, OutMpegFrame=0, OutMpegAbs=0,
-                Kind=0, Color=-1,
+                Kind=kind, Color=-1,
                 ColorTableIndex=None, ActiveLoop=None, Comment=None, BeatLoopSize=None, CueMicrosec=None,
                 created_at=now, updated_at=now,
             )
