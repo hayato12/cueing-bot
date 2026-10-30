@@ -54,13 +54,13 @@ MVP に含めるのはこのうち一部のみ（[docs/development-process.md](d
 
 - 言語は Python 3.12 に統一し、uv で管理する。テストは pytest、リンターとフォーマッターは ruff、型チェックは pyright（[ADR 0002](docs/adr/0002-python-and-tooling.md)）
 - ライブラリの情報（プレイリスト、曲、既存のキュー）は、毎回取る master.db のコピーから pyrekordbox で読む。グリッドとフレーズは解析ファイル（`PQTZ`・`PSSI`）から読む。XML エクスポートは使わない。本物の master.db を開くのは書くときだけ（[ADR 0003](docs/adr/0003-read-library-from-db-copy.md)）
+- MVP の音声解析は、Rekordbox の解析ファイル（グリッド・フレーズ）、Demucs `htdemucs`（ボーカルの分離）、ffmpeg（読み込み）、numpy（拍ごとの音量）に絞る。自前の拍検出と構造解析モデルは入れない（[ADR 0004](docs/adr/0004-audio-analysis-stack.md)）
 - キューはメモリーとホットの両方を書く。手動キューが 1 つでもある曲には書かない。評価指標は「同じ小節」の的中率など M1〜M5（[requirements.md](docs/requirements.md)。2026-10-30 決定）
 
 ## 7. 未決定事項（要相談）
 
 | 項目 | 検討メモ |
 |---|---|
-| 音声解析ライブラリ | 候補：librosa、madmom、essentia、楽曲構造解析モデル（all-in-one 系）など。ジャンル（4 つ打ち・2-step）での拍検出精度に加え、M4 Mac・新しい Python でインストールできるかも比較する |
 | ML の手法 | ルールベース（構造境界＋小節グリッド）をベースラインにして、学習モデルとの比較で効果を示す案 |
 | UI | CLI のみで始めるか、何らかの GUI を付けるか |
 

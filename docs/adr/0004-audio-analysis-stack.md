@@ -1,6 +1,6 @@
 # ADR 0004：MVP の音声解析は Rekordbox の解析 ＋ Demucs で始め、自前の拍検出や構造解析モデルは入れない
 
-- 状態：**案（要相談）**（2026-10-30）
+- 状態：**承認**（2026-10-30、オーナー）
 - 関係する記録：[ADR 0002](0002-python-and-tooling.md)、[ADR 0003](0003-read-library-from-db-copy.md)、[スパイク 1](../spikes/01-vocal-detection.md)、[スパイク 2](../spikes/02-phrase-analysis.md)、[requirements.md](../requirements.md)（N7・N8・N11）
 
 ## 背景
@@ -40,10 +40,12 @@ CLAUDE.md の未決定事項「音声解析ライブラリ」を決める。候�
 
 ## 決定
 
-（オーナーの確認後に書く）
+- MVP の解析の道具は **Rekordbox の解析ファイル（pyrekordbox）、Demucs `htdemucs`、ffmpeg、numpy** にする
+- 自前の拍検出（madmom・librosa・essentia）と構造解析モデル（all-in-one 系）は MVP に入れない
+- Demucs と torch は依存のグループを分け、CI では入れない。分離した音声は保存せず、拍ごとの音量などの特徴量だけを保存する
 
 ## 結果
 
-- CLAUDE.md の未決定事項「音声解析ライブラリ」を決定済みに移す
+- CLAUDE.md の未決定事項「音声解析ライブラリ」を決定済みに移した
 - 自前の拍検出や構造解析モデルを入れるときは、新しい ADR を書く
 - ffmpeg は Homebrew で入れる前提を README に書く（Sprint 0）
