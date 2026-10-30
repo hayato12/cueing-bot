@@ -1,6 +1,6 @@
 # スパイク 4：master.db にキューを直接書けるか
 
-状態：**調査中**（2026-10-29〜）。既存ツールの調査が済み、下調べのスクリプトを用意した段階。
+状態：**調査中**（2026-10-29〜）。既存ツールの調査と、master.db のコピーの下調べが済んだ。次は書き込みの試験。
 
 ## 背景
 
@@ -50,7 +50,7 @@ python3 scripts/spikes/spike4_inspect_cues.py ~/llm/cueing-bot/data/db/master.db
 
 1. Rekordbox を終了する
 2. `master.db`・`master.db-wal`・`master.db-shm` を `~/llm/cueing-bot/data/db/backup-日時/` にコピーする（加えて、Rekordbox の「ライブラリのバックアップ」も取る）
-3. スクリプトで、E と F にメモリーキューを 3 つずつ書く。下調べで分かった Rekordbox と同じ形（`djmdCue`・`contentCue`・`CueUpdated`・USN）で書く
+3. [scripts/spikes/spike4_write_cues.py](../../scripts/spikes/spike4_write_cues.py) で、E と F にメモリーキューを 3 つずつ書く。下調べで分かった Rekordbox と同じ形（`djmdCue`・`contentCue`・`CueUpdated`・USN）で書く。引数なしなら表示だけ、`--execute` でバックアップを取ってから書く（手順 2 のバックアップもスクリプトが行う）
 4. Rekordbox を起動し、画面でキューの位置と、キューから再生したときの位置を確かめる
 5. XML でエクスポートし、キューが入っているか確かめる
 6. USB に書き出し、XDJ-RR でメモリーキューを呼び出せるか確かめる
@@ -59,5 +59,29 @@ python3 scripts/spikes/spike4_inspect_cues.py ~/llm/cueing-bot/data/db/master.db
 うまくいけば、VBR の MP3、FLAC、`contentCue` を書かない場合などに広げる。
 
 ## 結果
+
+### 下調べ（2026-10-30、master.db のコピー）
+
+[scripts/spikes/spike4_inspect_cues.py](../../scripts/spikes/spike4_inspect_cues.py) を、10/28 15:39 に取ったコピーで動かした（pyrekordbox 0.4.4、`repo/.venv`）。読み取りだけで、コピーの更新日時も変わっていない。出力は `~/llm/cueing-bot/data/spike4/inspect.txt`。
+
+| 項目 | 結果 |
+|---|---|
+| 曲のファイルの種類 | 3,165 曲のうち **M4A が 2,535 曲**、MP3 が 412 曲、WAV が 140 曲、ほか（FileType 25 が 65、26 が 6、MP4 が 4、AIFF が 2、FLAC が 1） |
+| `InFrame` | **8,446 行すべてで `floor(InMsec * 150 / 1000)`**（rbx の観察どおり） |
+| MP3 の `InMpegFrame`・`InMpegAbs` | MP3 のキュー 1,421 行のうち **1,414 行が両方 0**。残り 7 行は `InMpegFrame` だけ値があり、どれも曲の頭から 0.2 秒以内のキュー（値は `InFrame` の半分ほど）。**0 で書けば Rekordbox 自身とほぼ同じ** |
+| `contentCue` | キューのある曲 1,577 曲すべてに行がある（キューが 0 になった曲の行も 8 つ残っている）。JSON の要素数は **すべての曲で `djmdCue` の行数と一致**。行の ID は曲の UUID |
+| JSON の形 | `djmdCue` の 1 行が 1 要素。`ID`・`ContentID`・`ContentUUID`・`InMsec`・`InFrame`・`InMpegFrame`・`InMpegAbs`・`OutMsec`・`OutFrame`・`OutMpegFrame`・`OutMpegAbs`・`Kind`・`Color`・`UUID`・`created_at`・`updated_at` は必ずある。`ColorTableIndex`・`ActiveLoop`・`BeatLoopSize`・`CueMicrosec`・`Comment` は値が NULL なら書かない（`Comment` は空文字でも書かない）。日時は `2026-10-28T14:25:01.621+00:00` の形 |
+| 列の値の 2 つの型 | 画面で打ったキューの多く（ホット 3,518 行、メモリー 4,309 行）は `Color` が -1、`ColorTableIndex`・`ActiveLoop`・`Comment`・`BeatLoopSize`・`CueMicrosec` が NULL。XML で取り込んだキュー（スパイク 3 のテスト曲）は、それらが 0（`Color` は 255） |
+| 共通 | `OutMsec` は -1（ループ以外）、`OutFrame`・`OutMpegFrame`・`OutMpegAbs` は 0。キューの行の `usn`・`rb_local_usn` は NULL、`rb_*` の状態の列は 0 |
+| USN | テスト曲 E・F・G で、`contentCue.rb_local_usn` は `djmdContent.rb_local_usn` より 1 小さい（`contentCue` を書いてから曲の行を書いている）。`djmdContent.CueUpdated` はキューを変えるたびに増えている |
+| メモリーキューの数 | 1 曲あたり最大 **10**（10 個の曲が 15 曲）。rbx の「10 個まで」と合う |
+
+**分かったこと**
+
+1. **MP3 の位置の列は、心配していたほどの問題ではない。** Rekordbox 自身が MP3 のキューのほぼすべてで `InMpegFrame`・`InMpegAbs` を 0 にしている。そもそもライブラリの 8 割は M4A
+2. **キューを書くときは `djmdCue` と `contentCue` をそろえる必要がある。** Rekordbox 自身のデータでは、両者が全曲で一致している。djcues のように `djmdCue` だけを書くと、この一致が崩れる
+3. 書き込みの形は、画面で打ったキュー（`Color` -1、任意の列は NULL）にそろえる。USN は「`contentCue` → 曲の行」の順に 1 ずつ進める。`CueUpdated` も増やす
+
+### 書き込みの試験
 
 （未実施）
