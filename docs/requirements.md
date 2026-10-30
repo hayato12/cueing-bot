@@ -183,6 +183,7 @@ M1〜M4 は評価スクリプトで毎回出す。M5 は実際に使って測る
 ### 論点 15：レビューのやり方（多段レビュー）
 
 オーナーの希望：Anthropic の Claude Code チームの「多段レビュー」（[Solving code review at Anthropic](https://claude.dev/blog/solving-code-review-at-anthropic/)）のようにしたい。
+PR の単位は、ストーリーごと（1 Issue 1 ブランチ 1 PR）を前提にする（development-process.md Phase 4 の「小さなブランチと PR」）。
 記事の段階と、このプロジェクトでのやり方の案：
 
 | 記事の段階 | 内容 | このプロジェクトで |
