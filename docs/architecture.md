@@ -1,0 +1,145 @@
+# アーキテクチャ（Phase 3）
+
+状態：**案（要相談）**（2026-10-30）。ここに書くのは「あとから変えにくいこと」だけ。クラスの構成、推定のルールの中身、CLI のオプションはスプリントで決める（[development-process.md](development-process.md) の Phase 3）。
+
+前提にする決定：[ADR 0001](adr/0001-write-cues-to-master-db.md)（master.db に直接書く）、[ADR 0002](adr/0002-python-and-tooling.md)（Python 3.12・uv）、[ADR 0003](adr/0003-read-library-from-db-copy.md)（master.db のコピーと解析ファイルから読む）、[ADR 0004](adr/0004-audio-analysis-stack.md)（Rekordbox の解析 ＋ Demucs）、[requirements.md](requirements.md)。
+
+## 1. 全体の構成図
+
+```mermaid
+flowchart LR
+    subgraph RB["Rekordbox（Mac の中）"]
+        DB[(master.db)]
+        ANLZ[[解析ファイル<br/>PQTZ・PSSI]]
+        AUDIO[[音源<br/>M4A・MP3]]
+    end
+
+    subgraph APP["cueing-bot"]
+        CLI["CLI<br/>（後で MCP も）"]
+        LIB["library<br/>DB のコピーを読む"]
+        AUD["audio<br/>ffmpeg → Demucs<br/>→ 拍ごとの音量"]
+        EST["estimate<br/>推定（差し替え可能）<br/>ルール → 後で ML"]
+        STORE[("data フォルダ<br/>（リポジトリの外）<br/>特徴量・推定結果・<br/>一覧 CSV・バックアップ")]
+        REP["report<br/>要確認の一覧"]
+        EVAL["evaluate<br/>M1〜M4"]
+        WR["writer<br/>master.db に書く<br/>（ADR 0001）"]
+    end
+
+    DB -- コピー --> LIB
+    ANLZ --> LIB
+    AUDIO --> AUD
+    LIB -- Track --> AUD
+    LIB -- Track --> EST
+    AUD -- Features --> EST
+    AUD <--> STORE
+    EST -- Estimate --> STORE
+    STORE --> REP
+    STORE --> EVAL
+    LIB -- 手動キュー（正解） --> EVAL
+    STORE --> WR
+    WR -- "書く直前に読み直し → 書く" --> DB
+    CLI --> LIB & EST & REP & EVAL & WR
+```
+
+使い方の流れは 2 つのコマンドに分ける。
+
+1. **推定**（Rekordbox を起動したままでよい）：プレイリストを指定する → DB のコピーを読む → 1 曲ずつ特徴量を作って推定する → 結果を data フォルダに保存する → 要確認の一覧をターミナルに出し、CSV にも保存する（S2〜S5）
+2. **反映**（Rekordbox と rekordboxAgent を終了してから）：保存した推定結果を指定する → 書く内容を表示する（既定は表示だけ）→ ユーザーが確かめて実行する → ADR 0001 の決めごとに沿って書く（S6）
+
+評価（S1）は、推定結果と手動キュー（正解）を比べて M1〜M4（キューごとの的中率、全的中の曲の割合、要確認の精度と割合）を出す。
+
+## 2. モジュールと依存の向き
+
+| モジュール | 役割 | 外の道具 |
+|---|---|---|
+| `model` | モジュール間で受け渡すデータの形（3 章） | なし |
+| `library` | master.db のコピーを取り、プレイリスト・曲・既存のキュー・グリッド・フレーズを読んで `Track` にする | pyrekordbox |
+| `audio` | 音源を読み、分離し、拍ごとの音量を出して `Features` にする | ffmpeg、Demucs、numpy |
+| `estimate` | `Track` と `Features` から `Estimate` を作る。ルールベースと ML を差し替えられる | numpy だけ |
+| `store` | 特徴量と推定結果を data フォルダに保存し、読み出す（N9） | なし |
+| `report` | 要確認の一覧をターミナルと CSV に出す | なし |
+| `evaluate` | 正解を取り出し、`Estimate` と比べて M1〜M4 を出す | なし |
+| `writer` | ADR 0001 の決めごとに沿って master.db に書く | pyrekordbox |
+| `cli` | 上を組み合わせてコマンドにする。後で MCP サーバーも同じ組み合わせを呼ぶ | — |
+
+**決めたいこと：依存の向き。** `estimate` と `evaluate` は `model` だけに依存し、pyrekordbox や Demucs を知らない。こうすると次の利点がある。
+
+- 推定を差し替えても（ルール → ML）、評価と書き込みはそのまま使える（CLAUDE.md 8 章）
+- `estimate`・`evaluate` のテストは、作り物のグリッドとフレーズで書ける。個人データも重い依存も要らないので、CI で回せる（決定 14）
+
+TypeScript でいえば、`model` が共有の型定義、`library`・`audio`・`writer` が外部とのアダプター、`estimate` が純粋なドメインロジック、という分け方にあたる。
+
+## 3. モジュール間でやりとりするデータの形
+
+型の名前と主な中身だけ決める。細かい項目はスプリントで足す。Python では `dataclass`（TypeScript の `readonly` な型に近い）で書く。
+
+### Track（library → audio・estimate・evaluate）
+
+| 項目 | 内容 |
+|---|---|
+| `id` | `djmdContent.ID`。書き込みまでこの ID で曲を指す |
+| `title`・`artist` | 一覧の表示用 |
+| `path`・`file_type` | 音源の場所と形式（N10 の判定に使う） |
+| `beats` | グリッドの拍の列。各拍は「時刻（ms）」と「小節内の拍番号（1〜4）」 |
+| `phrases` | フレーズの列。各フレーズは「頭の拍の番号」と種類。曲の mood も持つ |
+| `existing_cues` | 既存のキュー（種類、パッド、時刻）。決定 11 と正解の取り出しに使う |
+| `fingerprint` | 音源（パス・大きさ・更新日時）とグリッドから作る値。変わったら保存済みの結果を使わない（N9） |
+
+### Features（audio → estimate）
+
+| 項目 | 内容 |
+|---|---|
+| `vocal_db_per_beat` | 拍ごとのボーカルの音量（dB）。`beats` と同じ長さ |
+| `version` | 特徴量の作り方の版。変えたら作り直す |
+
+### Estimate（estimate → store・report・evaluate・writer）
+
+| 項目 | 内容 |
+|---|---|
+| `track_id` | `Track.id` |
+| `cues` | 推定キューの列。各キューは「役割」「位置」「要確認の理由（なければ空）」 |
+| `track_review` | 曲全体の要確認の理由（形式が未確認、テンポが一定でない、など） |
+| `estimator` | 推定の名前と版（例：`rules-v1`）。評価の記録に残す |
+
+- **役割**は 4 種類：`A メロの頭`、`A メロの頭の 2L 前`、`メインのホット（A〜G）`、`アウトロのホット H`。メインのホットは、2 回目以降のメインの数だけ並ぶ
+- **要確認の理由**は決まった種類（コード）＋説明文にする。一覧で絞り込めるようにするため
+
+### 位置の表し方（決めたいこと）
+
+**推定キューの位置は「グリッドの拍の番号」で持ち、ms に直すのは書くときだけにする。**
+
+- 拍の番号なら、必ず拍の頭に乗る。小節の 1 拍目かどうかも `beats` から分かる
+- 一覧に出す小節番号も、評価で比べる小節も、拍の番号から計算する
+- ms で持つと、テンポが一定でない曲や M4A の頭の無音（スパイク 4）で、グリッドとのずれが入り込む
+- 書く直前にグリッドが変わっていたら、拍の番号から ms に直せないので、その曲は書かずに「要確認」にする（ADR 0003）
+
+## 4. 保存するもの（N9・N12・決定 13）
+
+すべてリポジトリの外の **data フォルダ**（既定は `~/llm/cueing-bot/data/`。環境変数で変えられる）に置く。
+
+| もの | 単位 | 形式 | 役割 |
+|---|---|---|---|
+| master.db のコピー | 実行ごと | そのまま | 読み取り用（ADR 0003）。使い終わったら消す |
+| 特徴量 | 曲ごと | JSON | 重い分離をやり直さずに済ませる。`fingerprint` と `version` が同じなら使い回す |
+| 推定結果 | 実行ごと（中は曲ごと） | JSON | 反映するときに指定する。途中で止まっても、終わった曲を飛ばして続けられる |
+| 要確認の一覧 | 実行ごと | CSV | S5。曲名入りなのでリポジトリの外 |
+| 評価の結果 | 評価ごと | JSON（集計だけリポジトリにも） | 前回と比べる（S1）。曲名入りの明細は外、集計の数字だけリポジトリに残す（D3） |
+| master.db のバックアップ | 書き込みごと | 3 ファイルのコピー | 直近 5 回分（N12） |
+
+JSON にするのは、中を目で見て確かめやすいため。拍ごとの音量は 1 曲あたり数百〜千個ほどの数で、JSON でも小さい。
+
+## 5. テストの分け方
+
+| 種類 | 対象 | どこで回す |
+|---|---|---|
+| 単体テスト | `estimate`・`evaluate`・`report`・`store`・拍と ms の変換。作り物の `Track`・`Features` を使う | CI ＋ Mac |
+| 結合テスト（個人データ） | `library` で master.db のコピーを読む、`audio` で実際の曲を分離する | Mac だけ（pytest のマークで分ける） |
+| 書き込みの確認 | `writer`。テスト用の曲（デモ曲のコピー）に書き、Rekordbox の画面で確かめる | Mac だけ、手で（D7） |
+
+## 6. 決めないこと（スプリントで決める）
+
+- クラスや関数の細かい分け方、パッケージの中のファイル構成
+- 推定のルールの中身（フレーズとボーカルの音量の組み合わせ方）
+- CLI のコマンド名とオプション、出力の見た目
+- 評価データ b（オーナーが確認した 30 曲）のファイルの形
+- MCP サーバーの形（Sprint 4 以降）
