@@ -109,3 +109,14 @@ Demo Track 1（E）を macOS の `afconvert` で AAC 256kbps の M4A にした�
 - MPEG の列は MP3 と同じく 0。M4A でも位置は `InMsec`（と `InFrame`）だけで決まっているとみられる
 
 **まだ確かめていないこと（更新）**：USB への書き出しと XDJ-RR での呼び出し、VBR の MP3、WAV・FileType 25/26 の曲
+
+### ホットキュー（2026-10-30）
+
+同じ M4A のテスト曲に、`--hot A=33 D=49 H=57` を付けて書いた（メモリーキュー 9・25・41 小節目も書き直し）。書く直前のバックアップは `data/db/backup-20261030-222622/`、記録は `data/spike4/*-hot.txt`。
+
+- ホットキューは `Kind` でパッドを表す：A=1、D=5、H=9 で書いた。`Color` は -1、`ColorTableIndex` など任意の列は NULL（画面で打ったホットキューの多くと同じ形）
+- エラーなし。`djmdCue` 6 行と `contentCue` の JSON 6 要素が一致、ライブラリ全体の食い違いも 0
+- **A・D・H が正しいパッドに出て、色も Rekordbox の既定の色で付き、パッドを押すと小節の頭から鳴った**（オーナーが確認）。`Kind` の対応（A〜C が 1〜3、D〜H が 5〜9、4 は使わない）は正しい
+- **気をつける点：Rekordbox 本体を終了しても、常駐の rekordboxAgent が master.db を開いていることがある。** 今回は終了の後に起動し直していて、`master.db-wal` に未反映の書き込みも残っていたので、書くのを止めて rekordboxAgent も終了してもらった。書く前は、rekordboxAgent も止まっていること、master.db を開いているプロセスがないこと（`lsof` など）を確かめる
+
+これで、MVP の 4 つのキュー（メモリー 2 つ、ホット 2 つ）はどれも DB に直接書ける。
