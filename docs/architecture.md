@@ -6,47 +6,44 @@
 
 ## 1. 全体の構成図
 
+流れは「推定」「反映」「評価」の 3 つ。1 つの図に入れると矢印が重なるので、流れごとに分けて描く。CLI（後で MCP も）はどの流れでも入り口になるだけなので、図には描かない。
+
+**① 推定**（Rekordbox を起動したままでよい。S2〜S5）
+
 ```mermaid
-flowchart LR
-    subgraph RB["Rekordbox（Mac の中）"]
-        DB[(master.db)]
-        ANLZ[[解析ファイル<br/>PQTZ・PSSI]]
-        AUDIO[[音源<br/>M4A・MP3]]
-    end
-
-    subgraph APP["cueing-bot"]
-        CLI["CLI<br/>（後で MCP も）"]
-        LIB["library<br/>DB のコピーを読む"]
-        AUD["audio<br/>ffmpeg → Demucs<br/>→ 拍ごとの音量"]
-        EST["estimate<br/>推定（差し替え可能）<br/>ルール → 後で ML"]
-        STORE[("data フォルダ<br/>（リポジトリの外）<br/>特徴量・推定結果・<br/>一覧 CSV・バックアップ")]
-        REP["report<br/>要確認の一覧"]
-        EVAL["evaluate<br/>M1〜M4"]
-        WR["writer<br/>master.db に書く<br/>（ADR 0001）"]
-    end
-
-    DB -- コピー --> LIB
-    ANLZ --> LIB
-    AUDIO --> AUD
-    LIB -- Track --> AUD
-    LIB -- Track --> EST
-    AUD -- Features --> EST
-    AUD <--> STORE
-    EST -- Estimate --> STORE
-    STORE --> REP
-    STORE --> EVAL
-    LIB -- 手動キュー（正解） --> EVAL
-    STORE --> WR
-    WR -- "書く直前に読み直し → 書く" --> DB
-    CLI --> LIB & EST & REP & EVAL & WR
+flowchart TD
+    DB[(master.db)] -- コピー --> LIB["library<br/>プレイリスト・曲・グリッド・フレーズを読む"]
+    ANLZ[[解析ファイル]] --> LIB
+    LIB -- Track --> AUD["audio<br/>ffmpeg → Demucs → 拍ごとの音量"]
+    AUDIO[[音源]] --> AUD
+    AUD -- Features --> EST["estimate<br/>推定（ルール → 後で ML）"]
+    EST -- Estimate --> STORE[("data フォルダ<br/>推定結果")]
+    STORE --> REP["report<br/>要確認の一覧（ターミナル・CSV）"]
 ```
 
-使い方の流れは 2 つのコマンドに分ける。
+`estimate` は `Track` も受け取る（図では `audio` を通して渡している）。
 
-1. **推定**（Rekordbox を起動したままでよい）：プレイリストを指定する → DB のコピーを読む → 1 曲ずつ特徴量を作って推定する → 結果を data フォルダに保存する → 要確認の一覧をターミナルに出し、CSV にも保存する（S2〜S5）
-2. **反映**（Rekordbox と rekordboxAgent を終了してから）：保存した推定結果を指定する → 書く内容を表示する（既定は表示だけ）→ ユーザーが確かめて実行する → ADR 0001 の決めごとに沿って書く（S6）
+**② 反映**（Rekordbox と rekordboxAgent を終了してから。S6）
 
-評価（S1）は、推定結果と手動キュー（正解）を比べて M1〜M4（キューごとの的中率、全的中の曲の割合、要確認の精度と割合）を出す。
+```mermaid
+flowchart TD
+    STORE[("data フォルダ<br/>推定結果")] --> WR["writer<br/>書く内容を表示（既定はここまで）"]
+    WR -- ユーザーが確かめて実行 --> CHK["書く直前に本物の master.db で<br/>キューとグリッドを読み直す"]
+    CHK -- 手動キューなし・グリッドが同じ --> DB[(master.db)]
+    CHK -- それ以外 --> SKIP["書かずに一覧で知らせる"]
+```
+
+**③ 評価**（S1）
+
+```mermaid
+flowchart TD
+    DB[(master.db のコピー)] --> LIB["library<br/>手動キュー（正解）を読む"]
+    STORE[("data フォルダ<br/>推定結果")] --> EVAL["evaluate<br/>M1〜M4 を出す"]
+    LIB --> EVAL
+    EVAL --> OUT["評価の結果<br/>（集計の数字だけリポジトリへ）"]
+```
+
+推定と反映は別のコマンドにする。推定は時間がかかるので Rekordbox を使いながら回せるようにし、反映は保存した推定結果を指定して、Rekordbox を終了してから短時間で済ませる。評価の M1〜M4 は、キューごとの的中率、全的中の曲の割合、要確認の精度と割合。
 
 ## 2. モジュールと依存の向き
 
