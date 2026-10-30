@@ -94,6 +94,7 @@ python3 scripts/spikes/spike4_inspect_cues.py ~/llm/cueing-bot/data/db/master.db
 - エラーなく終わった。書いた後の DB のコピーを読むと、E・F とも `djmdCue` 3 行と `contentCue` の JSON 3 要素が一致。ライブラリ全体でも、`contentCue` と数が合わない曲・欠けている曲は 0
 - `CueUpdated` は E が 9→15、F が 6→10。USN は `contentCue` → 曲の行の順に 1 ずつ進んだ
 - **Rekordbox を起動すると、E・F の波形にメモリーキューが 3 つずつ出た**（オーナーの画面で確認）
+- **それぞれのキューから再生すると、9・25・41 小節目の頭から鳴った。いつも使う曲 2〜3 曲のキューも変わっていなかった**（オーナーが確認）
 - pyrekordbox が「プレイリスト 5 つが masterPlaylists6.xml にない」と警告した。照合の警告で、プレイリストには書いていない。masterPlaylists6.xml は Rekordbox の終了時に更新されていて、スクリプトのバックアップには入っていない（zip には入っている）
 
-**まだ確かめていないこと**：キューから再生したときの位置、ほかの曲のキューに変化がないか、USB への書き出しと XDJ-RR での呼び出し、M4A・VBR の MP3 の曲
+**まだ確かめていないこと**：USB への書き出しと XDJ-RR での呼び出し（オーナーが出先のため後日）、M4A・VBR の MP3 の曲
