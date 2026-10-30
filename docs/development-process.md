@@ -17,8 +17,8 @@ Phase 5 公開・まとめ(README、評価結果、全体の振り返り)
 
 - [x] Phase 0：コンセプト（`docs/concept.md`）
 - [x] Phase 1：具体化（`docs/story-map.md`、`docs/spikes/`）
-- [ ] Phase 2：要件化 ← **次はここ**
-- [ ] Phase 3：初期設計
+- [x] Phase 2：要件化（`docs/requirements.md`、GitHub Issues #1〜#6）
+- [ ] Phase 3：初期設計 ← **次はここ**
 - [ ] Sprint 0：リポジトリ整備
 - [ ] Sprint 1：手動キューの統計と評価スクリプト
 - [ ] Sprint 2：ルールベースのベースライン
@@ -53,7 +53,7 @@ Phase 5 公開・まとめ(README、評価結果、全体の振り返り)
   - 非機能要件を決める（ライブラリを壊さない、M4 / 16GB で 1 曲あたり何秒以内、など）
   - 評価指標と目標値を決める（例：±1 小節以内の F1 が 0.7 以上）
   - 完成の定義（Definition of Done）を決める（テストが通る、評価スクリプトの数値を記録した、など）
-- **成果物**：GitHub Issues と Projects ボード、`docs/requirements.md`
+- **成果物**：GitHub Issues、`docs/requirements.md`。Projects ボードは作らず、Issues のラベル（`story`、`sprint-1`〜`sprint-3`）で管理する（2026-10-30 オーナー決定）
 
 ## Phase 3：初期設計（どう作るか）
 
@@ -89,7 +89,7 @@ MVP は「機能を最小にした製品」ではなく、**仮説を確かめ�
 | イベント | やり方 |
 |---|---|
 | スプリント | 1 週間。ゴールは 1 つに絞る（例：F1 を測れるようにする） |
-| 計画 | バックログから今週やるものを選び、Projects ボードに置く |
+| 計画 | バックログから今週やるものを選び、Issue に `sprint-N` のラベルを付ける |
 | 実装 | 小さなブランチと PR に分けて進める。Claude Code にレビューさせる |
 | レビュー | 評価スクリプトの数値を見る。加えて、実際にキューを打った曲でミックスしてみる |
 | 振り返り | KPT で 5 分。`docs/retro/` に 1 ファイル追加 |
