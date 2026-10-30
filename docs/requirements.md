@@ -185,7 +185,7 @@ M1〜M4 は評価スクリプトで毎回出す。M5 は実際に使って測る
 Anthropic の Claude Code チームの多段レビュー（[Solving code review at Anthropic](https://claude.dev/blog/solving-code-review-at-anthropic/)）を、個人開発に合う範囲で取り入れる。
 
 - **PR の単位**：ストーリーごと（1 Issue 1 ブランチ 1 PR）。development-process.md Phase 4 の「小さなブランチと PR」
-- **PR の前**：作者側の Claude がテストとリンターを回して出力を見せ、`/code-review` と `/security-review` を通す。指摘は直すか、理由を付けて閉じる
+- **PR の前**：作者側の Claude がテストとリンターを回して出力を見せ、`/code-review` と `/security-review` をローカルで通す。結果は PR の説明に載せる。指摘は直すか、理由を付けて閉じる
 - **REVIEW.md**：何を重く見るかを書く（ライブラリを壊す、個人データが入る、評価の数字をごまかす、など）。レビューのたびに CLAUDE.md と一緒に読ませる
 - **CI を必須にする**：テストとリンターが GitHub Actions で通らないとマージしない（決定 14）
 - **PR テンプレート**：「どう確かめたか」「どう戻すか」の欄を必ず書く
@@ -193,14 +193,7 @@ Anthropic の Claude Code チームの多段レビュー（[Solving code review 
 - **最後はオーナーが見てマージする。** Claude の承認は、人の承認に数えない
 - 記事の段階 6〜7（マージキュー、段階的なリリースなど）は、個人開発には大きすぎるのでやらない。戻すのは git の revert と DB のバックアップで足りる
 
-### 未決定：PR ごとの自動 AI レビュー
-
-PR を開くたびに、GitHub Actions で Claude に自動でレビューさせるか（記事の段階 2 に一番近い形）。
-
-| 案 | 内容 | 良い点 | 気になる点 |
-|---|---|---|---|
-| 入れない | 上の「PR の前」のレビューだけにする | 追加のお金がかからない | PR ごとに自動では回らない |
-| 入れる | Claude Code の GitHub Action を入れる | 毎回自動で、記事の形に近い | Anthropic の API キーと従量課金が要る（Actions の無料枠とは別） |
+- **PR ごとの自動 AI レビュー（GitHub Action）は入れない**（2026-10-30 オーナー決定）。Anthropic の API キーと従量課金が要るため。レビューは PR の前に `/code-review` と `/security-review` をローカルで回し、**その結果を PR の説明に載せる**
 
 REVIEW.md と PR テンプレート、CI の設定は Sprint 0（リポジトリ整備）で作る。
 
