@@ -50,12 +50,14 @@ MVP に含めるのはこのうち一部のみ（[docs/development-process.md](d
 - **ユーザーの Rekordbox ライブラリを壊さないこと。** master.db に書くときは [ADR 0001](docs/adr/0001-write-cues-to-master-db.md) の決めごとを守る（Rekordbox の終了を確かめる、書く前にバックアップ、Rekordbox と同じ形で `djmdCue`・`contentCue` をそろえて書く、対象の曲のキュー以外に触れない、書く内容を先に見せる）
 - 音源ファイルや個人のライブラリデータ（エクスポート XML を含む）はリポジトリに含めない
 
-## 6. 未決定事項（要相談）
+## 6. 決定済みの技術方針
+
+- 言語は Python 3.12 に統一し、uv で管理する。テストは pytest、リンターとフォーマッターは ruff、型チェックは pyright（[ADR 0002](docs/adr/0002-python-and-tooling.md)）
+
+## 7. 未決定事項（要相談）
 
 | 項目 | 検討メモ |
 |---|---|
-| 実装言語 | 解析・ML は Python が有力。CLI / MCP サーバー部分を Python で統一するか、TypeScript で書くかは未定（案：Python に統一。MCP には公式 Python SDK がある） |
-| Python の環境管理ツール | 案：uv（`pyproject.toml` とロックファイルで管理） |
 | 音声解析ライブラリ | 候補：librosa、madmom、essentia、楽曲構造解析モデル（all-in-one 系）など。ジャンル（4 つ打ち・2-step）での拍検出精度に加え、M4 Mac・新しい Python でインストールできるかも比較する |
 | 教師データの取り出し方 | XML エクスポートか、ライブラリ（pyrekordbox 等）で DB を直接読むか。案：XML（公式機能で読み取りのみ、ビートグリッドも取れる） |
 | キューの種類 | Memory Cue のみか、Hot Cue も対象にするか |
@@ -64,7 +66,7 @@ MVP に含めるのはこのうち一部のみ（[docs/development-process.md](d
 | 評価指標 | 例：手動キューとの一致率（±1 拍／±1 小節以内の Precision / Recall / F1） |
 | UI | CLI のみで始めるか、何らかの GUI を付けるか |
 
-## 7. 技術メモ（実装時に要確認）
+## 8. 技術メモ（実装時に要確認）
 
 - Rekordbox XML ではキューは `TRACK` 要素配下の `POSITION_MARK` で表現され、`Start` は秒単位。Memory Cue は `Num="-1"`、Hot Cue は `Num="0"`〜`"7"`。`Type`（0 = キュー、4 = ループなど）や色の属性もある。**実装前に実際のエクスポートファイルで仕様を確認すること**
 - XML の `TEMPO` 要素に Rekordbox のビートグリッド（BPM・拍位置）が入っている。手動でグリッドを直した曲が多ければ、初期は自前の拍検出の代わりにこれを使い、自前の拍検出の正解データにもできる

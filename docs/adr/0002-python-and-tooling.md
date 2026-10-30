@@ -1,11 +1,11 @@
 # ADR 0002：Python に統一し、uv・pytest・ruff・pyright で開発する
 
-- 状態：**案（要相談）**（2026-10-30）
+- 状態：**承認**（2026-10-30、オーナー）
 - 関係する記録：[requirements.md](../requirements.md) の 5 章（D2・決定 14）、[ADR 0001](0001-write-cues-to-master-db.md)、[スパイク 1](../spikes/01-vocal-detection.md)・[スパイク 4](../spikes/04-db-write.md)
 
 ## 背景
 
-Phase 3 で、あとから変えにくいことのうち「何で書き、どう動かし、どう確かめるか」を決める。CLAUDE.md 6 章の「実装言語」「Python の環境管理ツール」と、requirements.md 5 章の注意（テストとリンターの道具は Phase 3 で決める）にあたる。
+Phase 3 で、あとから変えにくいことのうち「何で書き、どう動かし、どう確かめるか」を決める。CLAUDE.md の未決定事項の「実装言語」「Python の環境管理ツール」と、requirements.md 5 章の注意（テストとリンターの道具は Phase 3 で決める）にあたる。
 
 前提：
 
@@ -70,10 +70,15 @@ Phase 3 で、あとから変えにくいことのうち「何で書き、どう
 
 ## 決定
 
-（オーナーの確認後に書く）
+- **言語は Python に統一する**（CLI・MCP サーバーも含む）
+- **Python は 3.12。** Demucs が入らなければ 3.11 に下げる
+- **環境管理は uv**（`pyproject.toml` ＋ `uv.lock`）
+- **テストは pytest、リンターとフォーマッターは ruff、型チェックは pyright**
+
+ruff は、TypeScript でいう Biome に近い位置づけ（Rust 製で速く、リンターとフォーマッターを 1 つで兼ねる）。
 
 ## 結果
 
-- CLAUDE.md 6 章の「実装言語」「Python の環境管理ツール」を決定済みに移す
+- CLAUDE.md の「実装言語」「Python の環境管理ツール」を、未決定事項から決定済みの技術方針に移した
 - Sprint 0 で `pyproject.toml`・`uv.lock`・CI の設定を作る。スパイクのスクリプト（`scripts/spikes/`）は使い捨てなので、新しい環境には移さない
 - Sprint 0 で確かめること：Python 3.12 で Demucs と pyrekordbox 0.5.0 が入るか。pyrekordbox 0.5.0 で master.db のコピーを読めるか
