@@ -3,9 +3,11 @@
 使い方:
     python3 scripts/spikes/spike4_write_cues.py            # 書かずに、書く内容を表示するだけ（既定）
     python3 scripts/spikes/spike4_write_cues.py --execute  # バックアップを取ってから書く
+    python3 scripts/spikes/spike4_write_cues.py --target spike4-M4A-demo1  # 対象の曲を変える（ファイル名の一部、複数可）
 
 対象:
-    スパイク 3 のテスト曲（デモ曲のコピー）の E と F だけ。ファイル名で探し、ほかの曲には触れない。
+    既定ではスパイク 3 のテスト曲（デモ曲のコピー）の E と F だけ。ファイル名で探し、ほかの曲には触れない。
+    --target を付けると、その名前を含む曲を対象にする（"spike" を含む名前だけ受け付ける。本番の曲に書かないため）。
     それぞれのキューを全部消して、メモリーキューを 9・25・41 小節目の 3 つにする。
 
 書き方（スパイク 4 の下調べで分かった、Rekordbox 自身の書き方にそろえる）:
@@ -86,13 +88,16 @@ def backup(db_dir: Path) -> Path:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--execute", action="store_true", help="実際に書く（指定しなければ表示だけ）")
+    parser.add_argument("--target", nargs="+", default=list(TARGETS), help="対象の曲のファイル名の一部")
     args = parser.parse_args()
+    if any("spike" not in t for t in args.target):
+        raise SystemExit("--target にはテスト用の曲（名前に spike を含む）だけを指定してください")
 
     db = Rekordbox6Database()  # 本物の master.db（場所は pyrekordbox が Rekordbox の設定から見つける）
     print(f"DB: {db.db_directory / 'master.db'}")
 
     plans = []
-    for target in TARGETS:
+    for target in args.target:
         hits = [c for c in db.get_content() if target in (c.FolderPath or "")]
         if len(hits) != 1:
             raise SystemExit(f"'{target}' の曲が {len(hits)} 曲見つかりました（1 曲のはず）")
