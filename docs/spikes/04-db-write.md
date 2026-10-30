@@ -98,3 +98,14 @@ python3 scripts/spikes/spike4_inspect_cues.py ~/llm/cueing-bot/data/db/master.db
 - pyrekordbox が「プレイリスト 5 つが masterPlaylists6.xml にない」と警告した。照合の警告で、プレイリストには書いていない。masterPlaylists6.xml は Rekordbox の終了時に更新されていて、スクリプトのバックアップには入っていない（zip には入っている）
 
 **まだ確かめていないこと**：USB への書き出しと XDJ-RR での呼び出し（オーナーが出先のため後日）、M4A・VBR の MP3 の曲
+
+### M4A の曲（2026-10-30）
+
+Demo Track 1（E）を macOS の `afconvert` で AAC 256kbps の M4A にしたコピー（`data/spike4/tracks/spike4-M4A-demo1.m4a`）を、コレクションに入れて解析した。キューは打たずに、同じスクリプトで `--target spike4-M4A-demo1` を付けて書いた（書く直前のバックアップは `data/db/backup-20261030-220331/`、記録は `data/spike4/*-m4a.txt`）。
+
+- Rekordbox の解析では、最初の拍が 59ms。MP3 版（E）の 23ms より 36ms 後ろで、M4A の頭の無音（エンコーダーの遅延）のぶんがビートグリッドに入っているとみられる
+- キューはこのグリッドに合わせて 15.059s・45.059s・75.059s（9・25・41 小節目）に書いた。エラーなし。`djmdCue` 3 行と `contentCue` の JSON が一致、ライブラリ全体の食い違いも 0
+- **画面にメモリーキューが 3 つ出て、それぞれから再生すると小節の頭から鳴った**（オーナーが確認）
+- MPEG の列は MP3 と同じく 0。M4A でも位置は `InMsec`（と `InFrame`）だけで決まっているとみられる
+
+**まだ確かめていないこと（更新）**：USB への書き出しと XDJ-RR での呼び出し、VBR の MP3、WAV・FileType 25/26 の曲
