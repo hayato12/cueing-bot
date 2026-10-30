@@ -53,23 +53,21 @@ MVP に含めるのはこのうち一部のみ（[docs/development-process.md](d
 ## 6. 決定済みの技術方針
 
 - 言語は Python 3.12 に統一し、uv で管理する。テストは pytest、リンターとフォーマッターは ruff、型チェックは pyright（[ADR 0002](docs/adr/0002-python-and-tooling.md)）
+- ライブラリの情報（プレイリスト、曲、既存のキュー）は、毎回取る master.db のコピーから pyrekordbox で読む。グリッドとフレーズは解析ファイル（`PQTZ`・`PSSI`）から読む。XML エクスポートは使わない。本物の master.db を開くのは書くときだけ（[ADR 0003](docs/adr/0003-read-library-from-db-copy.md)）
+- キューはメモリーとホットの両方を書く。手動キューが 1 つでもある曲には書かない。評価指標は「同じ小節」の的中率など M1〜M5（[requirements.md](docs/requirements.md)。2026-10-30 決定）
 
 ## 7. 未決定事項（要相談）
 
 | 項目 | 検討メモ |
 |---|---|
 | 音声解析ライブラリ | 候補：librosa、madmom、essentia、楽曲構造解析モデル（all-in-one 系）など。ジャンル（4 つ打ち・2-step）での拍検出精度に加え、M4 Mac・新しい Python でインストールできるかも比較する |
-| 教師データの取り出し方 | XML エクスポートか、ライブラリ（pyrekordbox 等）で DB を直接読むか。案：XML（公式機能で読み取りのみ、ビートグリッドも取れる） |
-| キューの種類 | Memory Cue のみか、Hot Cue も対象にするか |
-| 既にキューがある曲の扱い | 飛ばす／足す／置き換える。案：既存のキューは消さない（ADR 0001 の「決めていないこと」） |
 | ML の手法 | ルールベース（構造境界＋小節グリッド）をベースラインにして、学習モデルとの比較で効果を示す案 |
-| 評価指標 | 例：手動キューとの一致率（±1 拍／±1 小節以内の Precision / Recall / F1） |
 | UI | CLI のみで始めるか、何らかの GUI を付けるか |
 
 ## 8. 技術メモ（実装時に要確認）
 
-- Rekordbox XML ではキューは `TRACK` 要素配下の `POSITION_MARK` で表現され、`Start` は秒単位。Memory Cue は `Num="-1"`、Hot Cue は `Num="0"`〜`"7"`。`Type`（0 = キュー、4 = ループなど）や色の属性もある。**実装前に実際のエクスポートファイルで仕様を確認すること**
-- XML の `TEMPO` 要素に Rekordbox のビートグリッド（BPM・拍位置）が入っている。手動でグリッドを直した曲が多ければ、初期は自前の拍検出の代わりにこれを使い、自前の拍検出の正解データにもできる
+- XML エクスポートはアプリでは使わない（ADR 0003）。グリッドは解析ファイルの `PQTZ` から読む（各拍の時刻と小節内の拍番号）。`PQTZ` が XML の `TEMPO` と同じものかは Sprint 0 で確かめる
+- 曲と解析ファイルの対応付けは、`djmdContent.AnalysisDataPath` で行う（Rekordbox 7 の解析ファイルにはフォルダのパスが入っていない。スパイク 2）
 - XML インポートでは、メモリーキューが 1 曲 1 つしか入らず、曲のキューが丸ごと置き換わる（スパイク 3）。そのため反映は DB への直接書き込みにした（ADR 0001）
 - master.db のキューの書き方（列の値、`contentCue` の JSON、USN）は [docs/spikes/04-db-write.md](docs/spikes/04-db-write.md) を参照
 - 評価では推定キューと手動キューを 1 対 1 で対応付ける。同じ位置にある Memory Cue と Hot Cue の重複は 1 つにまとめる
