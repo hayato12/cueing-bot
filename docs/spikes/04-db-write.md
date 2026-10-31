@@ -1,6 +1,6 @@
 # スパイク 4：master.db にキューを直接書けるか
 
-状態：**完了**（2026-10-29〜30）。MP3（CBR）と M4A で、DB に直接書いたメモリーキューが Rekordbox で使えた。これを受けて [ADR 0001](../adr/0001-write-cues-to-master-db.md) で反映の方式を決めた。USB への書き出しと XDJ-RR での呼び出しは、オーナーが後日確かめる。
+状態：**完了**（2026-10-29〜30）。MP3（CBR）と M4A で、DB に直接書いたメモリーキューが Rekordbox で使えた。これを受けて [ADR 0001](../adr/0001-write-cues-to-master-db.md) で反映の方式を決めた。USB への書き出しと XDJ-RR での呼び出しも、2026-10-31 に確かめて問題なかった（下の「USB と XDJ-RR」）。
 
 ## 背景
 
@@ -120,3 +120,12 @@ Demo Track 1（E）を macOS の `afconvert` で AAC 256kbps の M4A にした�
 - **気をつける点：Rekordbox 本体を終了しても、常駐の rekordboxAgent が master.db を開いていることがある。** 今回は終了の後に起動し直していて、`master.db-wal` に未反映の書き込みも残っていたので、書くのを止めて rekordboxAgent も終了してもらった。書く前は、rekordboxAgent も止まっていること、master.db を開いているプロセスがないこと（`lsof` など）を確かめる
 
 これで、MVP の 4 つのキュー（メモリー 2 つ、ホット 2 つ）はどれも DB に直接書ける。
+
+### USB と XDJ-RR（2026-10-31）
+
+オーナーが、スパイク 4 で書いたテスト曲 3 曲（`spike3-E`・`spike3-F` の MP3、`spike4-M4A-demo1` の M4A）を Rekordbox から USB に書き出し、XDJ-RR の実機で確かめた。
+
+- **問題なし**（オーナーの報告）。DB に直接書いたメモリーキューとホットキューが XDJ-RR で出て、位置も合っていた
+- XDJ-RR の世代が読む旧い形式（`PCOB`）も、Rekordbox が書き出しのときに作っていると考えられる。USB の解析ファイルの中身は読んでいない
+- これで ADR 0001 の「ここで問題が出たら見直す」の項目は解消した
+
