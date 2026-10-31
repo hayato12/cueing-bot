@@ -33,6 +33,17 @@ uv sync --all-groups  # Mac で音源も扱うとき（Demucs・torch。重い�
 
 CI（GitHub Actions）でも同じ 4 つを回す。PR の進め方とレビューの観点は [REVIEW.md](REVIEW.md) と [requirements.md](docs/requirements.md) 5 章。
 
+## ライブラリを読む（Mac）
+
+本物の master.db は開かず、毎回コピーを取ってコピーだけを読む（[ADR 0003](docs/adr/0003-read-library-from-db-copy.md)）。Rekordbox を起動したままでよい。コピーは data フォルダの `tmp/` に作り、終わったら消す。
+
+```sh
+uv run cueing-bot library playlists              # プレイリストの一覧
+uv run cueing-bot library inspect "<プレイリスト名>"  # 曲ごとの拍・フレーズ・既存のキューの数
+```
+
+場所は環境変数で変えられる：`CUEING_BOT_REKORDBOX_DIR`（既定 `~/Library/Pioneer/rekordbox`）、`CUEING_BOT_DATA_DIR`（既定 `~/llm/cueing-bot/data`）。
+
 ## データの置き場
 
 音源・ライブラリのデータ・推定結果は、リポジトリの外の data フォルダ（既定は `~/llm/cueing-bot/data/`）に置く。リポジトリには入れない。

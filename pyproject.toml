@@ -7,6 +7,7 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "numpy>=2.0",
     "pyrekordbox>=0.5.0,<0.6",  # DB の形の扱いが変わりうるので、上げるときは確かめ直す（ADR 0002）
+    "sqlalchemy>=2.0",  # pyrekordbox の中で使われている。PRAGMA を流すために直接も使う
 ]
 
 [project.scripts]
@@ -60,6 +61,7 @@ select = [
     "RUF",
 ]
 ignore = [
+    "E501",  # 行の長さはフォーマッターに任せる（日本語の docstring・コメントは幅の数え方で引っかかるため）
     "RUF001", "RUF002", "RUF003",  # 日本語の全角記号を許す
 ]
 
