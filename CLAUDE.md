@@ -1,0 +1,78 @@
+# CLAUDE.md
+
+Claude Code 向けのプロジェクト情報。開発の進め方と現在地は [docs/development-process.md](docs/development-process.md) を参照すること。
+
+「決定済み」と「未決定」を分けて書いている。未決定事項は勝手に決めず、選択肢とトレードオフを提示して確認を取ること。
+
+## 1. 概要
+
+DJ 楽曲を音声解析し、Rekordbox の Memory Cue（必要に応じて Hot Cue）を自動生成するアプリ。
+オーナーは過去に約 1,500 曲へ手動でキューを設定しており、これを教師データ兼評価データとして活用する。
+
+## 2. 背景と目的
+
+- DJ 活動の効率化（キュー打ちの手作業を減らす）
+- 音声解析・機械学習の学習
+- AI コーディングツール（Claude Code）を使った開発の実践
+- 個人開発（コンセプト作成〜要件化〜実装〜公開）を一通り経験する
+- 技術的意思決定の経験と、ポートフォリオ化（GitHub 公開予定）
+
+**優先順位の方針：** 転職用の見栄えのために機能を足すより、趣味として面白いこと・実際に DJ で使えることを優先する。
+
+## 3. オーナーについて
+
+- 本業はソフトウェアエンジニア／開発リード。TypeScript・React・NestJS・PostgreSQL・AWS・Terraform が主戦場
+- **Python は不慣れ**。Python のコードは意図や慣習を簡潔に説明しながら進める
+- 設計手法・テスト自動化・DX に関心が高い
+- DJ ジャンル：House / UK Garage / 2-step 中心、Afro 系も
+- 機材：Pioneer DJ XDJ-RR、Rekordbox で楽曲管理（myTag: Mood, Vocal Tool, UKG Feel など）
+- 開発マシン：MacBook Pro M4 / 16GB（重いモデルの学習・推論はメモリに注意）
+
+## 4. 想定機能（決定済みのスコープ）
+
+1. BPM・拍・小節（ダウンビート）位置の取得
+2. 曲構造の推定（イントロ／ブレイク／ドロップ／アウトロなど）
+3. イントロ・アウトロ検出
+4. 特徴量抽出
+5. 既存の手動キューからのパターン学習
+6. 機械学習によるキュー位置推定
+7. Rekordbox への反映（master.db にキューを直接書く。[ADR 0001](docs/adr/0001-write-cues-to-master-db.md)）
+8. MCP サーバー経由で AI エージェントから実行できるようにする
+
+MVP に含めるのはこのうち一部のみ（[docs/development-process.md](docs/development-process.md) の「MVP」を参照）。
+
+## 5. 作業の約束
+
+- 大きな方針決定（言語、ライブラリ、データ取り出し方法など）は選択肢とトレードオフを提示してから進め、決定したら `docs/adr/` に ADR として記録する
+- **評価方法を先に定義し、定量的に品質を測る。** 小さく動かして評価し、数値で改善を確認するサイクルを守る
+- 解決する課題を明確にし、技術選定の理由と設計上のトレードオフを記録する
+- 成果は GitHub で公開できる状態に保つ（README、再現手順、評価結果）
+- **ユーザーの Rekordbox ライブラリを壊さないこと。** 読み書きでは次を守る。REVIEW.md（Sprint 0 で作る）にも同じ項目を入れる
+  - 書くときは [ADR 0001](docs/adr/0001-write-cues-to-master-db.md) の 5 つの決めごとを守る（Rekordbox と rekordboxAgent が止まっていて master.db を開いているプロセスがないことを確かめる、書く前にバックアップを取って確かめる、Rekordbox と同じ形で `djmdCue`・`contentCue` をそろえて書く、対象の曲のキュー以外に触れない、書く内容を先に見せる）
+  - 書く直前に、本物の master.db でキューを、解析ファイルでグリッドを読み直す（[ADR 0003](docs/adr/0003-read-library-from-db-copy.md)）
+  - 確かめた Rekordbox のバージョン・音源の形式にだけ書く（[requirements.md](docs/requirements.md) の N2・N10）
+  - 読むときは本物の master.db を開かず、コピーを開く（ADR 0003）
+- 音源ファイルや個人のライブラリデータ（エクスポート XML を含む）はリポジトリに含めない
+
+## 6. 決定済みの技術方針
+
+- 言語は Python 3.12 に統一し、uv で管理する。テストは pytest、リンターとフォーマッターは ruff、型チェックは pyright（[ADR 0002](docs/adr/0002-python-and-tooling.md)）
+- ライブラリの情報（プレイリスト、曲、既存のキュー）は、毎回取る master.db のコピーから pyrekordbox で読む。グリッドとフレーズは解析ファイル（`PQTZ`・`PSSI`）から読む。XML エクスポートは使わない。本物の master.db を開くのは書くときだけ（[ADR 0003](docs/adr/0003-read-library-from-db-copy.md)）
+- MVP の音声解析は、Rekordbox の解析ファイル（グリッド・フレーズ）、Demucs `htdemucs`（ボーカルの分離）、ffmpeg（読み込み）、numpy（拍ごとの音量）に絞る。自前の拍検出と構造解析モデルは入れない（[ADR 0004](docs/adr/0004-audio-analysis-stack.md)）
+- キューはメモリーとホットの両方を書く。手動キューが 1 つでもある曲には書かない。評価指標は「同じ小節」の的中率など M1〜M5（[requirements.md](docs/requirements.md)。2026-10-30 決定）
+
+## 7. 未決定事項（要相談）
+
+| 項目 | 検討メモ |
+|---|---|
+| ML の手法 | ルールベース（構造境界＋小節グリッド）をベースラインにして、学習モデルとの比較で効果を示す案 |
+| UI | CLI のみで始めるか、何らかの GUI を付けるか |
+
+## 8. 技術メモ（実装時に要確認）
+
+- XML エクスポートはアプリでは使わない（ADR 0003）。グリッドは解析ファイルの `PQTZ` から読む（各拍の時刻と小節内の拍番号）。`PQTZ` が XML の `TEMPO` と同じものかは Sprint 0 で確かめる
+- 曲と解析ファイルの対応付けは、`djmdContent.AnalysisDataPath` で行う（Rekordbox 7 の解析ファイルにはフォルダのパスが入っていない。スパイク 2）
+- XML インポートでは、メモリーキューが 1 曲 1 つしか入らず、曲のキューが丸ごと置き換わる（スパイク 3）。そのため反映は DB への直接書き込みにした（ADR 0001）
+- master.db のキューの書き方（列の値、`contentCue` の JSON、USN）は [docs/spikes/04-db-write.md](docs/spikes/04-db-write.md) を参照
+- 評価では推定キューと手動キューを 1 対 1 で対応付ける。同じ位置にある Memory Cue と Hot Cue の重複は 1 つにまとめる
+- 推定部分は差し替え可能にする（入力：曲の情報、出力：推定キューのリスト）。ルールベースを ML に置き換えても、評価と DB への書き込みはそのまま使えるようにする

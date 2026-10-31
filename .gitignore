@@ -1,0 +1,16 @@
+# 個人のライブラリデータや音源はリポジトリに入れない（CLAUDE.md 5 章）
+*.xml
+*.mp3
+*.wav
+*.aif
+*.aiff
+*.flac
+*.m4a
+ANLZ*.DAT
+ANLZ*.EXT
+ANLZ*.2EX
+master.db
+
+# Python
+__pycache__/
+.venv/
