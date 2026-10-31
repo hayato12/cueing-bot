@@ -21,6 +21,10 @@ from cueing_bot.library.snapshot import Snapshot, snapshot
 from cueing_bot.model import ExistingCue, ExistingCues, Phrase, TrackInput
 
 
+class PlaylistError(LookupError):
+    """プレイリストを指定し間違えた（見つからない、同じ名前が複数ある、フォルダ）。"""
+
+
 class TrackReadError(RuntimeError):
     """1 曲を読めなかった。推定せずに「失敗」の一覧に出す（N9）。"""
 
@@ -37,14 +41,27 @@ def _open_db(db_path: Path) -> Any:
     return MasterDatabase(path=db_path, db_dir=db_path.parent)
 
 
+def _close_db(db: Any) -> None:
+    db.close()
+    db.engine.dispose()  # close() はセッションしか閉じないので、接続も閉じる
+
+
 def integrity_ok(db_path: Path) -> bool:
-    """コピーを開いて `PRAGMA integrity_check` をかける。"""
-    db = _open_db(db_path)
+    """コピーを開いて `PRAGMA quick_check` をかける。開けない・壊れているときは False。
+
+    integrity_check より速く、途中で書き込みが入って組み合わせの合わないコピーは見つけられる。
+    """
     try:
-        rows = db.session.execute(text("PRAGMA integrity_check")).fetchall()
+        db = _open_db(db_path)
+    except Exception:
+        return False
+    try:
+        rows = db.session.execute(text("PRAGMA quick_check")).fetchall()
         return [tuple(r) for r in rows] == [("ok",)]
+    except Exception:
+        return False
     finally:
-        db.close()
+        _close_db(db)
 
 
 class Library:
@@ -60,22 +77,27 @@ class Library:
     def playlists(self) -> list[PlaylistInfo]:
         out: list[PlaylistInfo] = []
         for pl in self._db.get_playlist().all():
+            if pl.rb_local_deleted:
+                continue
             out.append(PlaylistInfo(str(pl.ID), str(pl.Name), bool(pl.is_folder)))
         return out
 
     def track_ids_in_playlist(self, name: str) -> list[str]:
-        found = self._db.get_playlist(Name=name).all()
+        found = [p for p in self._db.get_playlist(Name=name).all() if not p.rb_local_deleted]
         if not found:
-            raise KeyError(f"プレイリストが見つかりません：{name}")
+            raise PlaylistError(f"プレイリストが見つかりません：{name}")
         if len(found) > 1:
-            raise KeyError(f"同じ名前のプレイリストが {len(found)} 個あります：{name}")
-        return [str(c.ID) for c in self._db.get_playlist_contents(found[0]).all()]
+            raise PlaylistError(f"同じ名前のプレイリストが {len(found)} 個あります：{name}")
+        if found[0].is_folder:
+            raise PlaylistError(f"フォルダです。中のプレイリストを指定してください：{name}")
+        contents = self._db.get_playlist_contents(found[0]).all()
+        return [str(c.ID) for c in contents if not c.rb_local_deleted]
 
     # --- 曲 ---------------------------------------------------------------
 
     def track_id_for_path(self, path: str) -> str | None:
         """音源のパスから曲の ID を引く。見つからなければ None。"""
-        found = self._db.get_content(FolderPath=path).all()
+        found = [c for c in self._db.get_content(FolderPath=path).all() if not c.rb_local_deleted]
         return str(found[0].ID) if len(found) == 1 else None
 
     def _content(self, track_id: str) -> Any:
@@ -100,9 +122,13 @@ class Library:
         try:
             dat_file: Any = AnlzFile.parse_file(dat)
             beat_in_bar, _bpms, times = dat_file.get_tag("PQTZ").get()
-        except Exception as e:  # pyrekordbox が読めない解析ファイル（スパイク 2 で 11 曲）
+            beats = beats_from_pqtz([int(b) for b in beat_in_bar], [float(t) for t in times])
+        except (
+            Exception
+        ) as e:  # pyrekordbox が読めない解析ファイル（スパイク 2 で 11 曲）、壊れたグリッド
             raise TrackReadError(f"PQTZ を読めません：ID={track_id}（{e}）") from e
-        beats = beats_from_pqtz([int(b) for b in beat_in_bar], [float(t) for t in times])
+        if not beats:
+            raise TrackReadError(f"グリッドが空です：ID={track_id}")
 
         mood: int | None = None
         phrases: tuple[Phrase, ...] = ()
@@ -164,4 +190,4 @@ def open_library(
         try:
             yield Library(db, rekordbox_dir, snap)
         finally:
-            db.close()
+            _close_db(db)

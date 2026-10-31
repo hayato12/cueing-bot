@@ -13,6 +13,7 @@ def rb_dir(tmp_path: Path) -> Path:
     d.mkdir()
     (d / "master.db").write_bytes(b"db")
     (d / "master.db-wal").write_bytes(b"wal")
+    (d / "master.db-shm").write_bytes(b"shm")
     (d / "masterPlaylists6.xml").write_text("<xml/>")
     return d
 
@@ -29,7 +30,7 @@ def test_copies_db_and_side_files_without_touching_the_original(
     assert snap.db_path.read_bytes() == b"db"
     assert (snap.directory / "master.db-wal").read_bytes() == b"wal"
     assert (snap.directory / "masterPlaylists6.xml").exists()
-    assert not (snap.directory / "master.db-shm").exists()  # 元にないファイルは作らない
+    assert not (snap.directory / "master.db-shm").exists()  # -shm は写さない
     assert snap.attempts == 1
     assert {p.name: p.stat().st_mtime_ns for p in rb_dir.iterdir()} == before
 
@@ -69,3 +70,32 @@ def test_context_manager_removes_the_copy(rb_dir: Path, tmp_path: Path) -> None:
         assert snap.db_path.exists()
     assert not snap.directory.exists()
     assert (rb_dir / "master.db").exists()
+
+
+def test_shm_changes_do_not_block_the_copy(
+    rb_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real_copy = shutil.copy2
+
+    def copy_and_touch_shm(src: Path, dst: Path) -> object:
+        (rb_dir / "master.db-shm").write_bytes(b"shm-touched")  # Rekordbox が読むたびに変わる
+        return real_copy(src, dst)
+
+    monkeypatch.setattr(snapshot_mod.shutil, "copy2", copy_and_touch_shm)
+    assert take_snapshot(rb_dir, tmp_path / "work", ok, wait_s=0).attempts == 1
+
+
+def test_errors_during_copy_or_check_are_retried_and_cleaned_up(
+    rb_dir: Path, tmp_path: Path
+) -> None:
+    calls = {"n": 0}
+
+    def check(_: Path) -> bool:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("file is not a database")
+        return True
+
+    snap = take_snapshot(rb_dir, tmp_path / "work", check, wait_s=0)
+    assert snap.attempts == 2
+    assert len(list((tmp_path / "work").iterdir())) == 1

@@ -18,7 +18,9 @@ from datetime import datetime
 from pathlib import Path
 
 DB_NAME = "master.db"
-SIDE_FILES = ("master.db-wal", "master.db-shm")
+SIDE_FILES = ("master.db-wal",)
+"""`-shm` は写さない。SQLite が開くときに `-wal` から作り直すうえ、Rekordbox が読むだけでも更新されるので、
+前後の比べに入れるとコピーがいつまでも取れなくなる。"""
 EXTRA_FILES = ("masterPlaylists6.xml",)
 """DB と一緒に写すファイル。pyrekordbox が DB と同じフォルダから読む。"""
 
@@ -63,9 +65,9 @@ def take_snapshot(
     attempts: int = 3,
     wait_s: float = 1.0,
 ) -> Snapshot:
-    """`src_dir` の master.db（と `-wal`・`-shm`・`masterPlaylists6.xml`）を `dest_root` の下にコピーする。
+    """`src_dir` の master.db（と `-wal`・`masterPlaylists6.xml`）を `dest_root` の下にコピーする。
 
-    `check` はコピーした master.db のパスを受け取り、開いて整合性（`PRAGMA integrity_check`）を確かめる関数。
+    `check` はコピーした master.db のパスを受け取り、開いて整合性（`PRAGMA quick_check`）を確かめる関数。
     暗号化された DB を開くのは pyrekordbox の仕事なので、ここでは受け取るだけにしている。
     """
     if not (src_dir / DB_NAME).is_file():
@@ -74,14 +76,19 @@ def take_snapshot(
     for attempt in range(1, attempts + 1):
         dest = dest_root / f"db-copy-{datetime.now():%Y%m%d-%H%M%S-%f}"
         dest.mkdir(parents=True)
-        before = _state(src_dir)
-        for name, size, _ in before:
-            if size >= 0:
-                shutil.copy2(src_dir / name, dest / name)
-        after = _state(src_dir)
-        if before == after and check(dest / DB_NAME):
+        try:
+            before = _state(src_dir)
+            for name, size, _ in before:
+                if size >= 0:
+                    shutil.copy2(src_dir / name, dest / name)
+            after = _state(src_dir)
+            good = before == after and check(dest / DB_NAME)
+        except Exception:
+            # コピーの最中に Rekordbox が -wal を消した、壊れたコピーを開けなかった、など。やり直す
+            good = False
+        if good:
             return Snapshot(dest / DB_NAME, dest, attempt, time.monotonic() - started)
-        shutil.rmtree(dest)
+        shutil.rmtree(dest, ignore_errors=True)
         if attempt < attempts:
             time.sleep(wait_s)
     raise SnapshotError(

@@ -31,7 +31,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def _cmd_library(args: argparse.Namespace) -> int:
     # pyrekordbox（と暗号化 DB を開く仕組み）は重いので、使うときだけ読み込む
-    from cueing_bot.library.reader import TrackReadError, open_library
+    from cueing_bot.library.reader import PlaylistError, TrackReadError, open_library
 
     if args.library_command not in ("playlists", "inspect"):
         print("library のサブコマンド（playlists・inspect）を指定してください")
@@ -46,7 +46,11 @@ def _cmd_library(args: argparse.Namespace) -> int:
                 print(f"{'[folder] ' if pl.is_folder else ''}{pl.name}")
             return 0
         if args.library_command == "inspect":
-            ids = lib.track_ids_in_playlist(args.playlist)
+            try:
+                ids = lib.track_ids_in_playlist(args.playlist)
+            except PlaylistError as e:
+                print(e)
+                return 2
             failed: list[str] = []
             print("曲\t拍\tフレーズ\tmood\t既存のキュー")
             for track_id in ids:
