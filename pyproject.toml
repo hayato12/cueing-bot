@@ -1,0 +1,74 @@
+[project]
+name = "cueing-bot"
+version = "0.1.0"
+description = "DJ 楽曲を解析し、Rekordbox のキューを自動で打つ（下書きを作る）アプリ"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "numpy>=2.0",
+    "pyrekordbox>=0.5.0",
+]
+
+[project.scripts]
+cueing-bot = "cueing_bot.cli:main"
+
+# 依存のグループ（npm の devDependencies に近い）。
+# CI は dev だけを入れる。audio は重い（torch を含む）ので、Mac で音源を扱うときだけ入れる:
+#   uv sync --group audio
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "ruff>=0.8",
+    "pyright>=1.1.390",
+]
+audio = [
+    "demucs>=4.0.1",
+]
+
+[tool.uv]
+default-groups = ["dev"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cueing_bot"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["-ra", "--strict-markers", "-m", "not personal_data"]
+markers = [
+    "personal_data: 個人のライブラリ（master.db・解析ファイル・音源）を使うテスト。Mac だけで `uv run pytest -m personal_data` で回す",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+extend-exclude = ["scripts/spikes"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",  # pycodestyle
+    "F",       # pyflakes
+    "I",       # import の並び
+    "B",       # よくあるバグ
+    "UP",      # 新しい書き方に寄せる
+    "SIM",     # 簡単にできる書き方
+    "PTH",     # os.path より pathlib
+    "RUF",
+]
+ignore = [
+    "RUF001", "RUF002", "RUF003",  # 日本語の全角記号を許す
+]
+
+[tool.pyright]
+include = ["src", "tests"]
+pythonVersion = "3.12"
+typeCheckingMode = "strict"
+venvPath = "."
+venv = ".venv"
+# 型の付いていない外部ライブラリ（pyrekordbox など）は境目で包む（ADR 0002）。
+# ライブラリ側の型の抜けは、包むモジュールだけで扱う。
+reportMissingTypeStubs = false

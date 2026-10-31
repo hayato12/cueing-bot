@@ -76,7 +76,7 @@ def read_key() -> str:
 
 
 def fmt(seconds: float) -> str:
-    m, s = divmod(int(round(seconds)), 60)
+    m, s = divmod(round(seconds), 60)
     return f"{m}:{s:02d}"
 
 
@@ -111,7 +111,8 @@ def main() -> int:
     out_path = out_dir / f"time-breakdown-{datetime.now():%Y%m%d-%H%M%S}.csv"
 
     print(__doc__.split("作業の種類が変わるたびに")[1].split("結果は")[0])
-    print("最初の作業のキーを押すと、1 曲目の計測が始まります。最後の曲が終わったら q を押してください。\n")
+    print("最初の作業のキーを押すと、1 曲目の計測が始まります。")
+    print("最後の曲が終わったら q を押してください。\n")
 
     segments: list[Segment] = []
     track = 1
@@ -153,7 +154,8 @@ def main() -> int:
         w = csv.writer(f)
         w.writerow(["track", "category", "start_s", "end_s", "seconds"])
         for s in segments:
-            w.writerow([s.track, s.category, f"{s.start - t0:.1f}", f"{s.end - t0:.1f}", f"{s.seconds:.1f}"])
+            start, end = s.start - t0, s.end - t0
+            w.writerow([s.track, s.category, f"{start:.1f}", f"{end:.1f}", f"{s.seconds:.1f}"])
 
     print("\n" + summarize(segments))
     print(f"\n保存しました：{out_path}")
