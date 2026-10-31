@@ -15,7 +15,15 @@ from enum import StrEnum
 
 from cueing_bot.evaluate.beats import BEATS_PER_BAR, bar_numbers
 from cueing_bot.evaluate.truth import TrackTruth
-from cueing_bot.model import MVP_ROLES, Estimate, Role
+from cueing_bot.model import HOT_CUE_TYPES, MVP_ROLES, CueType, Estimate, EstimatedCue, Role
+
+ROLE_CUE_TYPES: Mapping[Role, frozenset[CueType]] = {
+    Role.INTRO_END: frozenset({CueType.MEMORY}),
+    Role.INTRO_END_MINUS_2L: frozenset({CueType.MEMORY}),
+    Role.MAIN_HOT: HOT_CUE_TYPES,
+    Role.OUTRO_HOT: frozenset({CueType.HOT_H}),
+}
+"""役割ごとに正しいキューの種類。種類が違うキューは、位置が合っていても当たりにしない（書くと違うキューになる）。"""
 
 
 class Level(StrEnum):
@@ -47,11 +55,17 @@ class RoleOutcome:
     hits: Mapping[Level, int]
     diffs: tuple[int, ...]
     """組にした推定と正解のずれ（拍。推定が後ろなら正）。ずれの内訳を見るため。"""
+    wrong_type: int = 0
+    """種類が役割に合わない推定キューの数（ホット H をメインに使った、など）。外れとして数える。"""
+
+    @property
+    def n_estimated(self) -> int:
+        return len(self.estimated) + self.wrong_type
 
     @property
     def exact(self) -> bool:
-        """推定が正解とちょうど同じ（数も位置も）。正解が「ない」ときは、推定も出していなければ True。"""
-        return self.estimated == self.truth
+        """推定が正解とちょうど同じ（数も位置も種類も）。正解が「ない」ときは、推定も出していなければ True。"""
+        return self.estimated == self.truth and self.wrong_type == 0
 
 
 @dataclass(frozen=True)
@@ -60,8 +74,11 @@ class TrackOutcome:
     roles: Mapping[Role, RoleOutcome]
     """評価した役割だけ。正解が分からない役割は入らない。"""
     has_estimate: bool
+    """比べられる推定があったか。推定がない曲と、グリッドが変わって古くなった推定の曲は False。"""
     needs_review: bool
     """要確認が付いたか。推定がない曲（推定に失敗した曲）は、全部人がやるので要確認と数える。"""
+    stale: bool = False
+    """推定はあったが、推定のときと今でグリッドか音源が違った（`fingerprint` が違う）。"""
 
     @property
     def all_roles_known(self) -> bool:
@@ -104,7 +121,9 @@ class Scores:
     m4: Ratio
     n_tracks: int
     n_missing_estimate: int
-    """推定がなかった曲の数。推定を出さなかった（全部外れ）として数えている。"""
+    """推定がなかった曲の数（古くなった推定の曲を含む）。推定を出さなかった（全部外れ）として数えている。"""
+    n_stale: int = 0
+    """そのうち、推定が古くなっていた（`fingerprint` が違った）曲の数。"""
 
 
 @dataclass(frozen=True)
@@ -131,9 +150,12 @@ def _pair(estimated: Sequence[int], truth: Sequence[int]) -> list[tuple[int, int
 
 
 def compare_role(
-    estimated: Sequence[int], truth: Sequence[int], bars: Sequence[int]
+    estimated: Sequence[int], truth: Sequence[int], bars: Sequence[int], *, wrong_type: int = 0
 ) -> RoleOutcome:
-    """1 曲・1 役割の推定と正解を比べる。`bars` は拍ごとの小節番号。"""
+    """1 曲・1 役割の推定と正解を比べる。`bars` は拍ごとの小節番号。
+
+    `estimated` は種類の正しい推定キューの位置。種類の違うキューは数だけを `wrong_type` で受け取る。
+    """
     est = tuple(sorted(estimated))
     tru = tuple(sorted(truth))
     hits = dict.fromkeys(Level, 0)
@@ -147,18 +169,32 @@ def compare_role(
             hits[Level.SAME_BAR] += 1
         if abs(d) <= BEATS_PER_BAR:
             hits[Level.WITHIN_1_BAR] += 1
-    return RoleOutcome(truth=tru, estimated=est, hits=hits, diffs=tuple(diffs))
+    return RoleOutcome(
+        truth=tru, estimated=est, hits=hits, diffs=tuple(diffs), wrong_type=wrong_type
+    )
+
+
+def _role_outcome(
+    role: Role, cues: Sequence[EstimatedCue], truth: Sequence[int], bars: Sequence[int]
+) -> RoleOutcome:
+    mine = [c for c in cues if c.role == role]
+    ok = ROLE_CUE_TYPES[role]
+    good = [c.beat_index for c in mine if c.cue_type in ok]
+    return compare_role(good, truth, bars, wrong_type=len(mine) - len(good))
 
 
 def compare_track(truth: TrackTruth, estimate: Estimate | None) -> TrackOutcome:
+    """1 曲を比べる。推定の `fingerprint` が正解のときと違えば、拍の番号の指す位置が違うので比べない。"""
+    stale = estimate is not None and estimate.fingerprint != truth.fingerprint
+    usable = estimate if estimate is not None and not stale else None
     bars = bar_numbers(truth.beats)
-    cues = estimate.cues if estimate is not None else ()
+    cues = usable.cues if usable is not None else ()
     roles = {
-        role: compare_role([c.beat_index for c in cues if c.role == role], truth_beats, bars)
+        role: _role_outcome(role, cues, truth_beats, bars)
         for role, truth_beats in truth.roles.items()
     }
-    needs_review = estimate.needs_review if estimate is not None else True
-    return TrackOutcome(truth.track_id, roles, estimate is not None, needs_review)
+    needs_review = usable.needs_review if usable is not None else True
+    return TrackOutcome(truth.track_id, roles, usable is not None, needs_review, stale)
 
 
 def score(tracks: Sequence[TrackOutcome]) -> Scores:
@@ -167,7 +203,7 @@ def score(tracks: Sequence[TrackOutcome]) -> Scores:
         outcomes = [t.roles[role] for t in tracks if role in t.roles]
         roles[role] = RoleScore(
             n_tracks=len(outcomes),
-            n_estimated=sum(len(o.estimated) for o in outcomes),
+            n_estimated=sum(o.n_estimated for o in outcomes),
             n_truth=sum(len(o.truth) for o in outcomes),
             hits={lv: sum(o.hits[lv] for o in outcomes) for lv in Level},
             none_tracks=sum(1 for o in outcomes if not o.truth),
@@ -182,11 +218,12 @@ def score(tracks: Sequence[TrackOutcome]) -> Scores:
         m4=Ratio(sum(1 for t in tracks if t.needs_review), len(tracks)),
         n_tracks=len(tracks),
         n_missing_estimate=sum(1 for t in tracks if not t.has_estimate),
+        n_stale=sum(1 for t in tracks if t.stale),
     )
 
 
 def evaluate(truths: Iterable[TrackTruth], estimates: Mapping[str, Estimate]) -> Evaluation:
-    """正解のある曲ごとに推定と比べ、M1〜M4 を出す。推定がない曲は「何も出さなかった」と数える。
+    """正解のある曲ごとに推定と比べ、M1〜M4 を出す。推定がない曲・古い推定の曲は「何も出さなかった」と数える。
 
     推定のほうにだけある曲（正解のない曲）は数えない。
     """

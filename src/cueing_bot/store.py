@@ -12,7 +12,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from cueing_bot.evaluate.results import EvalRecord, record_from_dict, record_to_dict
+from cueing_bot.evaluate.results import (
+    EvalRecord,
+    SchemaVersionError,
+    record_from_dict,
+    record_to_dict,
+)
 from cueing_bot.model import CueType, Estimate, EstimatedCue, ReviewReason, Role
 
 ESTIMATES_SCHEMA_VERSION = 1
@@ -92,24 +97,33 @@ def load_estimates(path: Path) -> dict[str, Estimate]:
 
 
 def save_eval_record(directory: Path, record: EvalRecord) -> Path:
-    """`eval/` に日時付きの名前で保存する。"""
+    """`eval/` に日時付きの名前で保存する。同じ名前があれば番号を付け、上書きしない。"""
     estimator = "+".join(record.estimators) or "none"
-    name = f"{record.created_at:%Y%m%d-%H%M%S}-{record.dataset.kind}-{estimator}.json"
-    path = directory / _safe_name(name)
+    stem = _safe_name(f"{record.created_at:%Y%m%d-%H%M%S}-{record.dataset.kind}-{estimator}")
+    path = directory / f"{stem}.json"
+    n = 2
+    while path.exists():
+        path = directory / f"{stem}-{n}.json"
+        n += 1
     _write_json(path, record_to_dict(record))
     return path
 
 
 def load_eval_records(directory: Path) -> list[EvalRecord]:
-    """`eval/` の記録を全部読む。形の版が違う古い記録は飛ばす。"""
+    """`eval/` の記録を全部読む。形の版が違う古い記録だけは飛ばし、壊れた記録は誤りにする。
+
+    壊れた記録を黙って飛ばすと、もっと古い記録を「前回」として比べてしまうため。
+    """
     if not directory.is_dir():
         return []
     out: list[EvalRecord] = []
     for p in sorted(directory.glob("*.json")):
         try:
             out.append(record_from_dict(json.loads(p.read_text(encoding="utf-8"))))
-        except (ValueError, KeyError):
+        except SchemaVersionError:
             continue
+        except (ValueError, KeyError, TypeError) as e:
+            raise ValueError(f"評価の記録を読めません：{p.name}（{e}）") from e
     return out
 
 

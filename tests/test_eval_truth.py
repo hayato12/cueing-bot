@@ -88,6 +88,7 @@ def test_extracts_four_roles_from_a_typical_house_track() -> None:
                 ],
             ),
             beats,
+            "fp",
         )
     )
 
@@ -109,6 +110,7 @@ def test_short_intro_has_no_minus_2l_and_missing_hot_cues_mean_none() -> None:
         extract_truth(
             cues("t", [(CueType.MEMORY, at_bar(beats, 1)), (CueType.MEMORY, at_bar(beats, 5))]),
             beats,
+            "fp",
         )
     )
     assert result.truth.roles == {
@@ -132,6 +134,7 @@ def test_long_intro_without_minus_2l_cue_excludes_only_that_role() -> None:
                 ],
             ),
             beats,
+            "fp",
         )
     )
     assert Role.INTRO_END_MINUS_2L not in result.truth.roles
@@ -145,13 +148,13 @@ def test_cues_are_snapped_within_tolerance_and_far_ones_exclude_the_track() -> N
         "t",
         [(CueType.MEMORY, at_bar(beats, 1, 20.0)), (CueType.MEMORY, at_bar(beats, 5, -20.0))],
     )
-    assert extracted(extract_truth(near, beats)).truth.roles[Role.INTRO_END] == (16,)
+    assert extracted(extract_truth(near, beats, "fp")).truth.roles[Role.INTRO_END] == (16,)
 
     far = cues("t", [(CueType.MEMORY, at_bar(beats, 1)), (CueType.MEMORY, at_bar(beats, 5, 50.0))])
-    result = extract_truth(far, beats)
+    result = extract_truth(far, beats, "fp")
     assert isinstance(result, Excluded)
     assert result.reason == ExcludeReason.OFF_GRID
-    assert isinstance(extract_truth(far, beats, snap_tolerance_ms=60.0), Extracted)
+    assert isinstance(extract_truth(far, beats, "fp", snap_tolerance_ms=60.0), Extracted)
 
 
 def test_loops_and_unknown_kinds_are_ignored() -> None:
@@ -165,14 +168,14 @@ def test_loops_and_unknown_kinds_are_ignored() -> None:
             ExistingCue(4, at_bar(beats, 13), False),  # 知らない Kind
         ),
     )
-    roles = extracted(extract_truth(track, beats)).truth.roles
+    roles = extracted(extract_truth(track, beats, "fp")).truth.roles
     assert roles[Role.INTRO_END] == (16,)
 
 
 def test_tracks_with_fewer_than_two_memory_cues_are_excluded() -> None:
     beats = grid(32)
     result = extract_truth(
-        cues("t", [(CueType.MEMORY, 0), (CueType.HOT_A, at_bar(beats, 9))]), beats
+        cues("t", [(CueType.MEMORY, 0), (CueType.HOT_A, at_bar(beats, 9))]), beats, "fp"
     )
     assert isinstance(result, Excluded)
     assert result.reason == ExcludeReason.TOO_FEW_MEMORY_CUES
@@ -192,7 +195,7 @@ def test_build_dataset_a_drops_tracks_written_by_the_app_and_counts_reasons() ->
     written = cues("written", [(CueType.MEMORY, 0), (CueType.MEMORY, at_bar(beats, 17))])
     few = cues("few", [(CueType.MEMORY, 0)])
     data = build_dataset_a(
-        [(good, beats), (no_2l, beats), (written, beats), (few, beats)],
+        [(good, beats, "fp"), (no_2l, beats, "fp"), (written, beats, "fp"), (few, beats, "fp")],
         written_by_app={"written"},
     )
     assert [t.track_id for t in data.truths] == ["good", "no2l"]
@@ -203,9 +206,15 @@ def test_build_dataset_a_drops_tracks_written_by_the_app_and_counts_reasons() ->
     }
 
 
+def test_truth_keeps_the_fingerprint_of_the_grid() -> None:
+    beats = grid(32, 100.0)
+    track = cues("t", [(CueType.MEMORY, 0), (CueType.MEMORY, at_bar(beats, 5))])
+    assert extracted(extract_truth(track, beats, "abc")).truth.fingerprint == "abc"
+
+
 @pytest.mark.parametrize("n_beats", [0, 1])
 def test_too_short_grid_is_excluded(n_beats: int) -> None:
     beats = grid(1)[:n_beats]
-    result = extract_truth(cues("t", [(CueType.MEMORY, 0), (CueType.MEMORY, 10)]), beats)
+    result = extract_truth(cues("t", [(CueType.MEMORY, 0), (CueType.MEMORY, 10)]), beats, "fp")
     assert isinstance(result, Excluded)
     assert result.reason == ExcludeReason.NO_GRID

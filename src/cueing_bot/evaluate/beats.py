@@ -15,11 +15,15 @@ BEATS_PER_BAR = 4
 
 def nearest_beat(beats: Sequence[Beat], time_ms: float) -> tuple[int, float]:
     """`time_ms` に一番近い拍の番号と、そこからのずれ（ms。キューが拍より後ろなら正）を返す。"""
-    if not beats:
+    return nearest_in_times([b.time_ms for b in beats], time_ms)
+
+
+def nearest_in_times(times: Sequence[float], time_ms: float) -> tuple[int, float]:
+    """`nearest_beat` の、拍の時刻の列を先に作っておく版。1 曲で何度も引くときに使う。"""
+    if not times:
         raise ValueError("グリッドが空です")
-    times = [b.time_ms for b in beats]
     i = bisect.bisect_left(times, time_ms)
-    candidates = [j for j in (i - 1, i) if 0 <= j < len(beats)]
+    candidates = [j for j in (i - 1, i) if 0 <= j < len(times)]
     best = min(candidates, key=lambda j: abs(times[j] - time_ms))
     return best, time_ms - times[best]
 
@@ -39,13 +43,10 @@ def bar_numbers(beats: Sequence[Beat]) -> tuple[int, ...]:
 
 
 def bar_start_beat(beats: Sequence[Beat], bar: int) -> int | None:
-    """小節番号（1 始まり）の 1 拍目の拍の番号。グリッドの外なら None。"""
-    seen = 0
-    for i, b in enumerate(beats):
-        if b.beat_in_bar == 1:
-            seen += 1
-            if seen == bar:
-                return i
+    """小節番号（1 始まり）の 1 拍目の拍の番号。グリッドの外なら None。評価データ b の読み込みで使う。"""
+    for i, (b, n) in enumerate(zip(beats, bar_numbers(beats), strict=True)):
+        if n == bar and b.beat_in_bar == 1:
+            return i
     return None
 
 
@@ -54,7 +55,10 @@ def bpm(beats: Sequence[Beat]) -> float:
     if len(beats) < 2:
         raise ValueError("BPM を出すには 2 拍以上要ります")
     gaps = [b.time_ms - a.time_ms for a, b in itertools.pairwise(beats)]
-    return 60_000.0 / statistics.median(gaps)
+    median = statistics.median(gaps)
+    if median <= 0:
+        raise ValueError("拍の時刻が増えていません")
+    return 60_000.0 / median
 
 
 def l_bars(tempo: float) -> int:

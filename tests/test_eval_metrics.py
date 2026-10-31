@@ -12,7 +12,7 @@ FULL = {
 
 
 def truth(track_id: str = "t", roles: dict[Role, tuple[int, ...]] | None = None) -> TrackTruth:
-    return TrackTruth(track_id, BEATS, FULL if roles is None else roles)
+    return TrackTruth(track_id, "fp", BEATS, FULL if roles is None else roles)
 
 
 def est(
@@ -134,3 +134,37 @@ def test_cue_level_review_reason_also_flags_the_track() -> None:
     )
     assert flagged.needs_review
     assert evaluate([truth()], {"t": flagged}).scores.m4.num == 1
+
+
+def test_cue_of_the_wrong_type_is_never_a_hit() -> None:
+    base = est(outro=None, hots=(320,))
+    wrong = Estimate(
+        base.track_id,
+        base.fingerprint,
+        (
+            *base.cues,
+            EstimatedCue(CueType.MEMORY, 512, Role.MAIN_HOT),  # メインにメモリーキュー
+            EstimatedCue(CueType.HOT_A, 576, Role.OUTRO_HOT),  # アウトロに H 以外
+        ),
+        (),
+        base.estimator,
+    )
+    ev = evaluate([truth()], {"t": wrong})
+    hot = ev.scores.roles[Role.MAIN_HOT]
+    assert (hot.precision().num, hot.precision().den) == (1, 2)
+    assert (hot.recall().num, hot.recall().den) == (1, 2)
+    outro = ev.scores.roles[Role.OUTRO_HOT]
+    assert (outro.precision().num, outro.precision().den) == (0, 1)
+    assert ev.tracks[0].roles[Role.OUTRO_HOT].wrong_type == 1
+    assert ev.tracks[0].all_correct is False
+
+
+def test_estimate_made_on_another_grid_is_not_compared() -> None:
+    old = est()
+    stale = Estimate(old.track_id, "other-grid", old.cues, (), old.estimator)
+    ev = evaluate([truth()], {"t": stale})
+    assert ev.tracks[0].stale
+    assert not ev.tracks[0].has_estimate
+    assert ev.scores.n_stale == 1
+    assert ev.scores.n_missing_estimate == 1
+    assert ev.scores.roles[Role.INTRO_END].recall().num == 0

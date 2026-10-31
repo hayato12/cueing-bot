@@ -11,7 +11,7 @@ from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 
-from cueing_bot.evaluate.beats import nearest_beat, two_l_beats
+from cueing_bot.evaluate.beats import nearest_in_times, two_l_beats
 from cueing_bot.model import HOT_CUE_TYPES, Beat, CueType, ExistingCues, Role
 
 TRUTH_VERSION = "a-v1"
@@ -36,6 +36,8 @@ class TrackTruth:
     """
 
     track_id: str
+    fingerprint: str
+    """正解を取り出したときの `TrackInput.fingerprint`。推定のときとグリッドが違えば比べない。"""
     beats: tuple[Beat, ...]
     """正解を取り出したときのグリッド。「同じ小節」の判定に使う。"""
     roles: Mapping[Role, tuple[int, ...]]
@@ -77,6 +79,7 @@ class Excluded:
 def extract_truth(
     cues: ExistingCues,
     beats: Sequence[Beat],
+    fingerprint: str,
     *,
     snap_tolerance_ms: float = DEFAULT_SNAP_TOLERANCE_MS,
 ) -> Extracted | Excluded:
@@ -93,8 +96,11 @@ def extract_truth(
     """
     beats = tuple(beats)
     track_id = cues.track_id
-    if len(beats) < 2:
+    try:
+        two_l = two_l_beats(beats)
+    except ValueError:
         return Excluded(track_id, ExcludeReason.NO_GRID)
+    times = [b.time_ms for b in beats]
 
     memory: set[int] = set()
     hot_main: set[int] = set()
@@ -102,7 +108,7 @@ def extract_truth(
     for cue in cues.cues:
         if cue.is_loop or cue.cue_type not in _KNOWN_KINDS:
             continue
-        index, offset = nearest_beat(beats, cue.time_ms)
+        index, offset = nearest_in_times(times, cue.time_ms)
         if abs(offset) > snap_tolerance_ms:
             return Excluded(
                 track_id,
@@ -120,7 +126,6 @@ def extract_truth(
     if len(memory) < 2:
         return Excluded(track_id, ExcludeReason.TOO_FEW_MEMORY_CUES)
 
-    two_l = two_l_beats(beats)
     ordered = sorted(memory)
     block = [ordered[0]]
     for index in ordered[1:]:
@@ -139,11 +144,13 @@ def extract_truth(
     if minus_2l in memory:
         roles[Role.INTRO_END_MINUS_2L] = (minus_2l,)
     elif intro_end - block[0] < two_l:
+        # イントロのかたまりが 2L より短い。cueing-theory.md 3.1 では 2L 以上のイントロには 2L 前（＝L の
+        # 倍数ならイントロの頭）にも打つので、打っていなければイントロが短いと見なす
         roles[Role.INTRO_END_MINUS_2L] = ()
     else:
         role_excluded[Role.INTRO_END_MINUS_2L] = RoleExcludeReason.MINUS_2L_NOT_CUED
 
-    return Extracted(TrackTruth(track_id, beats, roles), role_excluded)
+    return Extracted(TrackTruth(track_id, fingerprint, beats, roles), role_excluded)
 
 
 @dataclass(frozen=True)
@@ -168,20 +175,23 @@ class DatasetA:
 
 
 def build_dataset_a(
-    tracks: Iterable[tuple[ExistingCues, Sequence[Beat]]],
+    tracks: Iterable[tuple[ExistingCues, Sequence[Beat], str]],
     written_by_app: Collection[str] = frozenset(),
     *,
     snap_tolerance_ms: float = DEFAULT_SNAP_TOLERANCE_MS,
 ) -> DatasetA:
-    """手動キューのある曲から評価データ a を作る。アプリが書いた曲は外す（S1）。"""
+    """手動キューのある曲から評価データ a を作る。アプリが書いた曲は外す（S1）。
+
+    `tracks` は (既存のキュー, グリッド, `TrackInput.fingerprint`) の列。
+    """
     truths: list[TrackTruth] = []
     excluded: list[Excluded] = []
     role_excluded: dict[str, Mapping[Role, RoleExcludeReason]] = {}
-    for cues, beats in tracks:
+    for cues, beats, fp in tracks:
         if cues.track_id in written_by_app:
             excluded.append(Excluded(cues.track_id, ExcludeReason.WRITTEN_BY_APP))
             continue
-        result = extract_truth(cues, beats, snap_tolerance_ms=snap_tolerance_ms)
+        result = extract_truth(cues, beats, fp, snap_tolerance_ms=snap_tolerance_ms)
         if isinstance(result, Excluded):
             excluded.append(result)
             continue

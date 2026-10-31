@@ -1,5 +1,7 @@
 from datetime import UTC, datetime, timedelta
 
+import pytest
+
 from cueing_bot.evaluate.metrics import evaluate
 from cueing_bot.evaluate.results import (
     DatasetInfo,
@@ -19,6 +21,7 @@ T0 = datetime(2026, 11, 1, 12, 0, tzinfo=UTC)
 def truth(track_id: str, intro: int) -> TrackTruth:
     return TrackTruth(
         track_id,
+        "fp",
         BEATS,
         {
             Role.INTRO_END: (intro,),
@@ -61,7 +64,7 @@ def test_record_dict_has_versions_counts_and_no_titles() -> None:
     assert d["dataset"]["truth_version"] == "a-v1"
     assert d["dataset"]["n_tracks"] == 1
     assert d["scores"]["m1"]["intro_end"]["same_beat"]["recall"]["value"] == 1.0
-    assert set(d["tracks"][0]) == {"track_id", "has_estimate", "needs_review", "roles"}
+    assert set(d["tracks"][0]) == {"track_id", "has_estimate", "needs_review", "stale", "roles"}
 
 
 def test_compare_lists_improved_and_regressed_tracks_on_common_truths() -> None:
@@ -101,3 +104,10 @@ def test_latest_comparable_picks_newest_earlier_record_with_same_dataset() -> No
     current = record([truth("x", 64)], [est("x", 64)], at=T0 + timedelta(hours=3))
     assert latest_comparable([old, newer, other, current], current) is newer
     assert latest_comparable([current], current) is None
+
+
+def test_naive_datetime_is_rejected() -> None:
+    with pytest.raises(ValueError, match="タイムゾーン"):
+        EvalRecord(
+            datetime(2026, 11, 1), ("v1",), DatasetInfo("a", "a-v1", "", 0), evaluate([], {})
+        )

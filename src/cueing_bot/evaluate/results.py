@@ -49,6 +49,11 @@ class EvalRecord:
     dataset: DatasetInfo
     evaluation: Evaluation
 
+    def __post_init__(self) -> None:
+        # タイムゾーンのない日時が混ざると、前回を探すときの比べで落ちる
+        if self.created_at.tzinfo is None:
+            raise ValueError("created_at にはタイムゾーンを付けてください（store.now() を使う）")
+
 
 # --- JSON に直す -----------------------------------------------------------------
 
@@ -61,6 +66,7 @@ def scores_to_dict(s: Scores) -> dict[str, Any]:
     return {
         "n_tracks": s.n_tracks,
         "n_missing_estimate": s.n_missing_estimate,
+        "n_stale": s.n_stale,
         "m1": {
             role.value: {
                 "n_tracks": rs.n_tracks,
@@ -90,12 +96,14 @@ def _outcome_to_dict(t: TrackOutcome) -> dict[str, Any]:
         "track_id": t.track_id,
         "has_estimate": t.has_estimate,
         "needs_review": t.needs_review,
+        "stale": t.stale,
         "roles": {
             role.value: {
                 "truth": list(o.truth),
                 "estimated": list(o.estimated),
                 "hits": {lv.value: o.hits[lv] for lv in Level},
                 "diffs": list(o.diffs),
+                "wrong_type": o.wrong_type,
             }
             for role, o in t.roles.items()
         },
@@ -110,12 +118,14 @@ def _outcome_from_dict(d: Mapping[str, Any]) -> TrackOutcome:
             estimated=tuple(int(x) for x in o["estimated"]),
             hits={lv: int(o["hits"][lv.value]) for lv in Level},
             diffs=tuple(int(x) for x in o["diffs"]),
+            wrong_type=int(o["wrong_type"]),
         )
     return TrackOutcome(
         track_id=str(d["track_id"]),
         roles=roles,
         has_estimate=bool(d["has_estimate"]),
         needs_review=bool(d["needs_review"]),
+        stale=bool(d["stale"]),
     )
 
 
@@ -137,9 +147,13 @@ def record_to_dict(r: EvalRecord) -> dict[str, Any]:
     }
 
 
+class SchemaVersionError(ValueError):
+    """記録の形の版が今と違う（古い記録）。"""
+
+
 def record_from_dict(d: Mapping[str, Any]) -> EvalRecord:
     if d.get("schema_version") != SCHEMA_VERSION:
-        raise ValueError(f"記録の形の版が違います：{d.get('schema_version')}")
+        raise SchemaVersionError(f"記録の形の版が違います：{d.get('schema_version')}")
     ds = d["dataset"]
     tracks = tuple(_outcome_from_dict(t) for t in d["tracks"])
     return EvalRecord(

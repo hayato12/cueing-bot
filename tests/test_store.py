@@ -44,9 +44,25 @@ def test_eval_records_are_saved_with_date_and_loaded(tmp_path: Path) -> None:
     path = store.save_eval_record(tmp_path, rec)
     assert path.parent == tmp_path
     assert path.name == "20261101-093005-a-rules_v1.json"
-    (tmp_path / "broken.json").write_text(json.dumps({"schema_version": 999}))
+    (tmp_path / "old.json").write_text(json.dumps({"schema_version": 999}))
     loaded = store.load_eval_records(tmp_path)
     assert [r.created_at for r in loaded] == [at]
+
+
+def test_eval_records_in_the_same_second_do_not_overwrite(tmp_path: Path) -> None:
+    at = datetime(2026, 11, 1, 9, 30, 5, tzinfo=UTC)
+    rec = EvalRecord(at, ("v1",), DatasetInfo("a", "a-v1", "", 0), evaluate([], {}))
+    first = store.save_eval_record(tmp_path, rec)
+    second = store.save_eval_record(tmp_path, rec)
+    assert first != second
+    assert second.name == "20261101-093005-a-v1-2.json"
+    assert len(store.load_eval_records(tmp_path)) == 2
+
+
+def test_broken_eval_record_is_an_error(tmp_path: Path) -> None:
+    (tmp_path / "broken.json").write_text(json.dumps({"schema_version": 1, "tracks": []}))
+    with pytest.raises(ValueError, match=r"broken\.json"):
+        store.load_eval_records(tmp_path)
 
 
 def test_written_track_ids_reads_all_logs(tmp_path: Path) -> None:
