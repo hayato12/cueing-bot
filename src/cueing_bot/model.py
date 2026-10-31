@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import IntEnum
+from enum import IntEnum, StrEnum
 
 
 @dataclass(frozen=True)
@@ -84,3 +84,81 @@ class ExistingCues:
 
     track_id: str
     cues: tuple[ExistingCue, ...]
+
+
+HOT_CUE_TYPES = frozenset(
+    {
+        CueType.HOT_A,
+        CueType.HOT_B,
+        CueType.HOT_C,
+        CueType.HOT_D,
+        CueType.HOT_E,
+        CueType.HOT_F,
+        CueType.HOT_G,
+    }
+)
+"""2 回目以降のメインに使うホットキュー（A〜G）。H はアウトロ専用（cueing-theory.md 3.2・3.3）。"""
+
+
+class Role(StrEnum):
+    """推定キューの役割。評価と表示のためのラベル（architecture.md 3 章）。
+
+    `StrEnum` は値が文字列の列挙型で、JSON にそのまま書ける。抜けのキューなどを足すときは、ここに増やす。
+    """
+
+    INTRO_END = "intro_end"
+    """A メロの頭（＝イントロの終わり）。メモリーキュー。"""
+    INTRO_END_MINUS_2L = "intro_end_minus_2l"
+    """A メロの頭の 2L 小節前。メモリーキュー。"""
+    MAIN_HOT = "main_hot"
+    """2 回目以降のメインの終わりの 2L 前。ホットキュー A〜G。"""
+    OUTRO_HOT = "outro_hot"
+    """アウトロの頭。ホットキュー H。"""
+
+
+MVP_ROLES: tuple[Role, ...] = (
+    Role.INTRO_END,
+    Role.INTRO_END_MINUS_2L,
+    Role.MAIN_HOT,
+    Role.OUTRO_HOT,
+)
+"""MVP で必ず打つ 4 つのキューの役割。"""
+
+
+@dataclass(frozen=True)
+class ReviewReason:
+    """「要確認」の理由。`code` で絞り込み、`message` を一覧に出す（S4・S5）。"""
+
+    code: str
+    message: str
+
+
+@dataclass(frozen=True)
+class EstimatedCue:
+    """推定キュー 1 つ。位置はグリッドの拍の番号で持つ（architecture.md 3 章「位置の表し方」）。"""
+
+    cue_type: CueType
+    beat_index: int
+    """`TrackInput.beats` の添字（0 始まり）。ms に直すのは書くときだけ。"""
+    role: Role
+    review: tuple[ReviewReason, ...] = ()
+    """このキューの要確認の理由。なければ空。"""
+
+
+@dataclass(frozen=True)
+class Estimate:
+    """1 曲ぶんの推定結果。`estimate` が作り、`store`・`report`・`evaluate`・`writer` が使う。"""
+
+    track_id: str
+    fingerprint: str
+    """推定に使った `TrackInput.fingerprint`。書く直前に今の値と比べる。"""
+    cues: tuple[EstimatedCue, ...]
+    track_review: tuple[ReviewReason, ...]
+    """曲全体の要確認の理由。なければ空。"""
+    estimator: str
+    """推定の名前と版（例：`rules-v1`）。評価の記録に残す。"""
+
+    @property
+    def needs_review(self) -> bool:
+        """曲かキューのどれかに要確認の理由があるか（M3・M4）。"""
+        return bool(self.track_review) or any(c.review for c in self.cues)
