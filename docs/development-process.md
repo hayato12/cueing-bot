@@ -96,11 +96,11 @@ MVP は「機能を最小にした製品」ではなく、**仮説を確かめ�
 
 スプリント計画のたたき台：
 
-- **Sprint 0**：リポジトリ整備（README、REVIEW.md、PR テンプレート、CI）、Python 環境（uv・pytest・ruff・pyright。ADR 0002）、master.db のコピーと解析ファイルの読み込み（ADR 0003）。あわせて、Python 3.12 で Demucs と pyrekordbox 0.5.0 が入るか、`PQTZ` が XML の `TEMPO` と同じかを確かめる
-- **Sprint 1**：手動キューの統計と評価スクリプト
-- **Sprint 2**：ルールベースのベースライン → 最初の M1〜M4 を出す
-- **Sprint 3**：master.db にキューを書いて Rekordbox に反映 → 実際の DJ で使う（MVP 完成）
-- **Sprint 4 以降**：ML モデル、MCP 化、精度改善。数値と使った感想を見て優先度を決める
+- **Sprint 0**：まず大きな不確かさを確かめる。(1) DB に書いたキューを USB に書き出し、XDJ-RR で呼び出せるか（オーナー。2026-10-31 に開始）、(2) 5 曲で作業時間の内訳（イントロ・メイン・抜け・アウトロ）を測る。そのうえで、リポジトリ整備（README、REVIEW.md、PR テンプレート、CI）、Python 環境（uv・pytest・ruff・pyright。ADR 0002）、master.db のコピーと解析ファイルの読み込み（ADR 0003）。あわせて、Python 3.12 で Demucs と pyrekordbox 0.5.0 が入るか、`PQTZ` が XML の `TEMPO` と同じかを確かめる
+- **Sprint 1**：手動キューの統計と評価スクリプト。評価データ b（開発用 10 曲・判定用 30 曲）をオーナーが聴いて作る（1〜2 時間）
+- **Sprint 2**：ルールベースのベースライン（フレーズとグリッドだけ。要確認の理由は 2〜3 種類）→ 最初の M1〜M4 を出す
+- **Sprint 3**：最初に VBR の MP3 を 1 曲で確かめる。master.db にキューを書いて Rekordbox に反映 → 実際の DJ で使う（MVP 完成）
+- **Sprint 4 以降**：Demucs のボーカルの音量を足して比べる、ML モデル、MCP 化、1 曲ずつの取り消し、アプリが打った曲の myTag の印、精度改善。数値と使った感想を見て優先度を決める
 
 ## Phase 5：公開・まとめ
 
