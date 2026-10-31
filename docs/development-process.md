@@ -18,8 +18,8 @@ Phase 5 公開・まとめ(README、評価結果、全体の振り返り)
 - [x] Phase 0：コンセプト（`docs/concept.md`）
 - [x] Phase 1：具体化（`docs/story-map.md`、`docs/spikes/`）
 - [x] Phase 2：要件化（`docs/requirements.md`、GitHub Issues #1〜#6）
-- [ ] Phase 3：初期設計 ← **次はここ**
-- [ ] Sprint 0：リポジトリ整備
+- [x] Phase 3：初期設計（`docs/architecture.md`、ADR 0002〜0004）
+- [ ] Sprint 0：リポジトリ整備 ← **次はここ**
 - [ ] Sprint 1：手動キューの統計と評価スクリプト
 - [ ] Sprint 2：ルールベースのベースライン
 - [ ] Sprint 3：Rekordbox への書き込みと実戦投入（MVP 完成）
@@ -79,7 +79,7 @@ MVP は「機能を最小にした製品」ではなく、**仮説を確かめ�
 
 範囲のたたき台（Phase 1 で確定させる）：
 
-- **入れる**：XML の読み込み、Rekordbox のグリッドの利用、ルールベースの推定、master.db への書き込み（[ADR 0001](adr/0001-write-cues-to-master-db.md)）、CLI、評価スクリプト
+- **入れる**：master.db のコピーと解析ファイルの読み込み（[ADR 0003](adr/0003-read-library-from-db-copy.md)）、Rekordbox のグリッドの利用、ルールベースの推定、master.db への書き込み（[ADR 0001](adr/0001-write-cues-to-master-db.md)）、CLI、評価スクリプト
 - **入れない**：ML モデル、MCP、GUI、自前の拍検出
 
 ## Phase 4：スプリント
@@ -96,7 +96,7 @@ MVP は「機能を最小にした製品」ではなく、**仮説を確かめ�
 
 スプリント計画のたたき台：
 
-- **Sprint 0**：リポジトリ整備（README、`.gitignore`、ADR 置き場）、Python 環境、XML の取り込み
+- **Sprint 0**：リポジトリ整備（README、REVIEW.md、PR テンプレート、CI）、Python 環境（uv・pytest・ruff・pyright。ADR 0002）、master.db のコピーと解析ファイルの読み込み（ADR 0003）。あわせて、Python 3.12 で Demucs と pyrekordbox 0.5.0 が入るか、`PQTZ` が XML の `TEMPO` と同じかを確かめる
 - **Sprint 1**：手動キューの統計と評価スクリプト
 - **Sprint 2**：ルールベースのベースライン → 最初の F1 を出す
 - **Sprint 3**：master.db にキューを書いて Rekordbox に反映 → 実際の DJ で使う（MVP 完成）

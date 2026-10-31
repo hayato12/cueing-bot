@@ -1,6 +1,6 @@
 # アーキテクチャ（Phase 3）
 
-状態：**案（要相談）**（2026-10-30）。ここに書くのは「あとから変えにくいこと」だけ。クラスの構成、推定のルールの中身、CLI のオプションはスプリントで決める（[development-process.md](development-process.md) の Phase 3）。
+状態：**承認**（2026-10-31、オーナー）。ここに書くのは「あとから変えにくいこと」だけ。クラスの構成、推定のルールの中身、CLI のオプションはスプリントで決める（[development-process.md](development-process.md) の Phase 3）。
 
 前提にする決定：[ADR 0001](adr/0001-write-cues-to-master-db.md)（master.db に直接書く）、[ADR 0002](adr/0002-python-and-tooling.md)（Python 3.12・uv）、[ADR 0003](adr/0003-read-library-from-db-copy.md)（master.db のコピーと解析ファイルから読む）、[ADR 0004](adr/0004-audio-analysis-stack.md)（Rekordbox の解析 ＋ Demucs）、[requirements.md](requirements.md)。
 
@@ -59,7 +59,7 @@ flowchart TD
 | `writer` | ADR 0001 の決めごとに沿って master.db に書く | pyrekordbox |
 | `cli` | 上を組み合わせてコマンドにする。後で MCP サーバーも同じ組み合わせを呼ぶ | — |
 
-**決めたいこと：依存の向き。** `estimate` と `evaluate` は `model` だけに依存し、pyrekordbox や Demucs を知らない。こうすると次の利点がある。
+**決定：依存の向き。** `estimate` と `evaluate` は `model` だけに依存し、pyrekordbox や Demucs を知らない。こうすると次の利点がある。
 
 - 推定を差し替えても（ルール → ML）、評価と書き込みはそのまま使える（CLAUDE.md 8 章）
 - `estimate`・`evaluate` のテストは、作り物のグリッドとフレーズで書ける。個人データも重い依存も要らないので、CI で回せる（決定 14）
@@ -101,7 +101,7 @@ TypeScript でいえば、`model` が共有の型定義、`library`・`audio`・
 - **役割**は 4 種類：`A メロの頭`、`A メロの頭の 2L 前`、`メインのホット（A〜G）`、`アウトロのホット H`。メインのホットは、2 回目以降のメインの数だけ並ぶ
 - **要確認の理由**は決まった種類（コード）＋説明文にする。一覧で絞り込めるようにするため
 
-### 位置の表し方（決めたいこと）
+### 位置の表し方（決定）
 
 **推定キューの位置は「グリッドの拍の番号」で持ち、ms に直すのは書くときだけにする。**
 
