@@ -64,3 +64,5 @@ Rekordbox の起動中にコピーを取ると、`master.db` と `-wal` をコ�
 - コピーするのは `master.db`・`-wal`・`masterPlaylists6.xml` で、**`-shm` は写さない。** `-shm` は SQLite が開くときに `-wal` から作り直すもので、Rekordbox が読むだけでも更新される。コピーの前後比べに入れると、Rekordbox の起動中はいつまでもコピーが取れなくなる
 - コピーの確かめは `PRAGMA integrity_check` ではなく `quick_check` にした。組み合わせの合わないコピーは見つけられ、全ページの照合を省けるぶん速い
 - コピーの置き場は data フォルダの `tmp/`。読み終わったら消す
+- 2026-10-31 にオーナーの Mac で確かめた：master.db 36MB・`-wal` 4MB のコピーと確かめが 0.2 秒（Rekordbox の起動中、1 回目で取得）。9 曲のプレイリストを失敗なく読めた
+- `PQTZ` と XML の `TEMPO` を 3,063 曲で比べ、87% が 1 ms 以内、99.8% が 20 ms 以内で一致した。小さなずれは XML の BPM が小数 2 桁に丸められているためとみられる。グリッドは `PQTZ` を使ってよい

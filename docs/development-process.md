@@ -19,8 +19,8 @@ Phase 5 公開・まとめ(README、評価結果、全体の振り返り)
 - [x] Phase 1：具体化（`docs/story-map.md`、`docs/spikes/`）
 - [x] Phase 2：要件化（`docs/requirements.md`、GitHub Issues #1〜#6）
 - [x] Phase 3：初期設計（`docs/architecture.md`、ADR 0002〜0004）
-- [ ] Sprint 0：リポジトリ整備 ← **次はここ**
-- [ ] Sprint 1：手動キューの統計と評価スクリプト
+- [x] Sprint 0：リポジトリ整備（2026-10-31）
+- [ ] Sprint 1：手動キューの統計と評価スクリプト ← **次はここ**
 - [ ] Sprint 2：ルールベースのベースライン
 - [ ] Sprint 3：Rekordbox への書き込みと実戦投入（MVP 完成）
 - [ ] Sprint 4 以降：ML・MCP・精度改善
@@ -96,7 +96,7 @@ MVP は「機能を最小にした製品」ではなく、**仮説を確かめ�
 
 スプリント計画のたたき台：
 
-- **Sprint 0**：まず大きな不確かさを確かめる。~~(1) DB に書いたキューを USB に書き出し、XDJ-RR で呼び出せるか~~（2026-10-31 に確認済み、問題なし）、(2) 5 曲で作業時間の内訳（イントロ・メイン・抜け・アウトロ）を測る。そのうえで、リポジトリ整備（README、REVIEW.md、PR テンプレート、CI）、Python 環境（uv・pytest・ruff・pyright。ADR 0002）、master.db のコピーと解析ファイルの読み込み（ADR 0003）。あわせて、Python 3.12 で Demucs と pyrekordbox 0.5.0 が入るか、`PQTZ` が XML の `TEMPO` と同じかを確かめる
+- **Sprint 0**：まず大きな不確かさを確かめる。~~(1) DB に書いたキューを USB に書き出し、XDJ-RR で呼び出せるか~~（2026-10-31 に確認済み、問題なし）、~~(2) 5 曲で作業時間の内訳（イントロ・メイン・抜け・アウトロ）を測る~~（2026-10-31 に 9 曲で測定。メイン 55%、抜け 9%。requirements.md 1 章）。そのうえで、リポジトリ整備（README、REVIEW.md、PR テンプレート、CI）、Python 環境（uv・pytest・ruff・pyright。ADR 0002）、master.db のコピーと解析ファイルの読み込み（ADR 0003）。あわせて、Python 3.12 で Demucs と pyrekordbox 0.5.0 が入るか、`PQTZ` が XML の `TEMPO` と同じかを確かめる（2026-10-31 にすべて完了。Demucs 4.1.0・torch 2.15.0 が Python 3.12 で入り、MPS も使える。master.db のコピーは 0.2 秒。PQTZ は TEMPO と同じ）
 - **Sprint 1**：手動キューの統計と評価スクリプト。評価データ b（開発用 10 曲・判定用 30 曲）をオーナーが聴いて作る（1〜2 時間）
 - **Sprint 2**：ルールベースのベースライン（フレーズとグリッドだけ。要確認の理由は 2〜3 種類）→ 最初の M1〜M4 を出す
 - **Sprint 3**：最初に VBR の MP3 を 1 曲で確かめる。master.db にキューを書いて Rekordbox に反映 → 実際の DJ で使う（MVP 完成）

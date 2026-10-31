@@ -39,7 +39,8 @@ def expected_beats(tempos: list[Any], end_ms: float) -> list[tuple[float, int]]:
 
 def compare(beats: tuple[Beat, ...], tempos: list[Any]) -> tuple[float, int, int]:
     """(いちばん大きいずれ ms, 拍番号が合わない拍の数, 比べた拍の数) を返す。"""
-    exp = expected_beats(tempos, beats[-1].time_ms)
+    # 最後の拍が丸めで切れないよう、終わりに 50 ms の余裕を持たせる
+    exp = expected_beats(tempos, beats[-1].time_ms + 50.0)
     times = [t for t, _ in exp]
     worst = 0.0
     mismatched = 0
@@ -65,7 +66,11 @@ def main() -> int:
             tempos = list(getattr(tr, "tempos", []) or [])
             if not tempos:
                 continue
-            track_id = lib.track_id_for_path(str(tr.Location))
+            # pyrekordbox は XML の Location を先頭の "/" なしで返すので、DB の FolderPath に合わせる
+            location = str(tr.Location)
+            if not location.startswith("/"):
+                location = "/" + location
+            track_id = lib.track_id_for_path(location)
             if track_id is None:
                 print(f"?\t{len(tempos)}\t-\t-\tDB に見つからない")
                 continue
