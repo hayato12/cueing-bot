@@ -70,7 +70,7 @@ MVP に含めるのはこのうち一部のみ（[docs/development-process.md](d
 
 ## 8. 技術メモ（実装時に要確認）
 
-- XML エクスポートはアプリでは使わない（ADR 0003）。グリッドは解析ファイルの `PQTZ` から読む（各拍の時刻と小節内の拍番号）。`PQTZ` が XML の `TEMPO` と同じものかは Sprint 0 で確かめる
+- XML エクスポートはアプリでは使わない（ADR 0003）。グリッドは解析ファイルの `PQTZ` から読む（各拍の時刻と小節内の拍番号）。`PQTZ` は XML の `TEMPO` と同じものと確かめた（2026-10-31、3,063 曲で 87% が 1 ms 以内、99.8% が 20 ms 以内。ずれは XML の BPM が小数 2 桁に丸められているためとみられる）
 - 曲と解析ファイルの対応付けは、`djmdContent.AnalysisDataPath` で行う（Rekordbox 7 の解析ファイルにはフォルダのパスが入っていない。スパイク 2）
 - XML インポートでは、メモリーキューが 1 曲 1 つしか入らず、曲のキューが丸ごと置き換わる（スパイク 3）。そのため反映は DB への直接書き込みにした（ADR 0001）
 - master.db のキューの書き方（列の値、`contentCue` の JSON、USN）は [docs/spikes/04-db-write.md](docs/spikes/04-db-write.md) を参照

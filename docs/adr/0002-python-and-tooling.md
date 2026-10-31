@@ -82,3 +82,8 @@ ruff は、TypeScript でいう Biome に近い位置づけ（Rust 製で速く�
 - CLAUDE.md の「実装言語」「Python の環境管理ツール」を、未決定事項から決定済みの技術方針に移した
 - Sprint 0 で `pyproject.toml`・`uv.lock`・CI の設定を作る。スパイクのスクリプト（`scripts/spikes/`）は使い捨てなので、新しい環境には移さない
 - Sprint 0 で確かめること：Python 3.12 で Demucs と pyrekordbox 0.5.0 が入るか。pyrekordbox 0.5.0 で master.db のコピーを読めるか
+
+## 追記（2026-10-31、Sprint 0 の確認）
+
+- オーナーの Mac（M4）で `uv sync --all-groups` が通り、Python 3.12.16 に Demucs 4.1.0・torch 2.15.0 が入った。MPS（Apple の GPU）も使える。3.11 に下げる必要はない
+- pyrekordbox 0.5.0 で master.db のコピーを読めた（テスト用のプレイリスト 9 曲すべて）
