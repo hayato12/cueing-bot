@@ -14,3 +14,16 @@ master.db
 # Python
 __pycache__/
 .venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+# 個人データの置き場（既定はリポジトリの外の ~/llm/cueing-bot/data/）を誤って中に作ったとき用
+/data/
+*.db
+*.db-wal
+*.db-shm
+*.db.bak
+# 曲名入りの CSV を誤って入れないため。テストの作り物と docs の集計だけは許す
+*.csv
+!tests/**/*.csv
+!docs/**/*.csv
