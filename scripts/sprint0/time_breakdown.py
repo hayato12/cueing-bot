@@ -49,6 +49,7 @@ LABELS_JA = {
     "grid": "グリッド",
     "other": "それ以外",
 }
+DOC = __doc__ or ""
 DEFAULT_OUT = Path.home() / "llm" / "cueing-bot" / "data" / "sprint0"
 
 
@@ -102,7 +103,7 @@ def summarize(segments: list[Segment]) -> str:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description=DOC.splitlines()[0])
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT, help="CSV の保存先フォルダ")
     args = parser.parse_args()
 
@@ -110,7 +111,7 @@ def main() -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / f"time-breakdown-{datetime.now():%Y%m%d-%H%M%S}.csv"
 
-    print(__doc__.split("作業の種類が変わるたびに")[1].split("結果は")[0])
+    print(DOC.split("作業の種類が変わるたびに")[1].split("結果は")[0])
     print("最初の作業のキーを押すと、1 曲目の計測が始まります。")
     print("最後の曲が終わったら q を押してください。\n")
 

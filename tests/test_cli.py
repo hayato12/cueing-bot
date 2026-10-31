@@ -11,6 +11,6 @@ def test_version(capsys: pytest.CaptureFixture[str]) -> None:
     assert __version__ in capsys.readouterr().out
 
 
-def test_no_args_prints_help(capsys: pytest.CaptureFixture[str]) -> None:
-    assert main([]) == 0
+def test_no_args_prints_usage_and_fails(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main([]) == 2
     assert "usage: cueing-bot" in capsys.readouterr().out

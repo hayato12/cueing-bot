@@ -153,7 +153,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "numpy", specifier = ">=2.0" },
-    { name = "pyrekordbox", specifier = ">=0.5.0" },
+    { name = "pyrekordbox", specifier = ">=0.5.0,<0.6" },
 ]
 
 [package.metadata.requires-dev]

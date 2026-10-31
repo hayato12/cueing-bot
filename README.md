@@ -15,9 +15,11 @@ DJ 楽曲を解析し、Rekordbox のキュー（Memory Cue・Hot Cue）の下�
 ## セットアップ
 
 ```sh
-uv sync                 # 依存を入れる（npm ci に近い）
-uv sync --group audio   # 音源を扱うとき（Demucs・torch。重い）
+uv sync               # 開発の依存だけ（CI と同じ。npm ci に近い）
+uv sync --all-groups  # Mac で音源も扱うとき（Demucs・torch。重い）
 ```
+
+`uv sync` はロックファイルどおりに入れ直すので、`--all-groups` を付けずに実行すると Demucs・torch が外れる。Mac では毎回 `uv sync --all-groups` を使う。
 
 ## 開発のコマンド
 

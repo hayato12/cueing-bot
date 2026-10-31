@@ -16,5 +16,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     parser.parse_args(argv)
-    parser.print_help()
-    return 0
+    # コマンドを指定しなかったときは使い方を出し、失敗（2）で終える。
+    # スクリプトや MCP から呼んだときに、何もせず成功したように見せないため
+    parser.print_usage()
+    return 2
