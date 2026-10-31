@@ -14,23 +14,24 @@
 flowchart TD
     DB[(master.db)] -- コピー --> LIB["library<br/>プレイリスト・曲・グリッド・フレーズを読む"]
     ANLZ[[解析ファイル]] --> LIB
-    LIB -- Track --> AUD["audio<br/>ffmpeg → Demucs → 拍ごとの音量"]
+    LIB -- TrackInput --> AUD["audio<br/>ffmpeg → Demucs → 拍ごとの音量"]
     AUDIO[[音源]] --> AUD
     AUD -- Features --> EST["estimate<br/>推定（ルール → 後で ML）"]
     EST -- Estimate --> STORE[("data フォルダ<br/>推定結果")]
     STORE --> REP["report<br/>要確認の一覧（ターミナル・CSV）"]
 ```
 
-`estimate` は `Track` も受け取る（図では `audio` を通して渡している）。
+`estimate` は `TrackInput` も受け取る（図では `audio` を通して渡している）。既存のキューは推定に渡さない（3 章）。
 
 **② 反映**（Rekordbox と rekordboxAgent を終了してから。S6）
 
 ```mermaid
 flowchart TD
-    STORE[("data フォルダ<br/>推定結果")] --> WR["writer<br/>書く内容を表示（既定はここまで）"]
-    WR -- ユーザーが確かめて実行 --> CHK["書く直前に本物の master.db で<br/>キューとグリッドを読み直す"]
-    CHK -- 手動キューなし・グリッドが同じ --> DB[(master.db)]
+    STORE[("data フォルダ<br/>推定結果")] --> PLAN["writer：計画を作る<br/>書く内容を ID 付きで保存して表示（既定はここまで）"]
+    PLAN -- ユーザーがその ID を指定して実行 --> CHK["書く直前に読み直す<br/>キューは本物の master.db、グリッドは解析ファイル"]
+    CHK -- 手動キューなし・グリッドが推定のときと同じ --> DB[(master.db)]
     CHK -- それ以外 --> SKIP["書かずに一覧で知らせる"]
+    DB --> VERIFY["書いたあとの確認<br/>対象の曲の行だけが変わったか"]
 ```
 
 **③ 評価**（S1）
@@ -43,6 +44,10 @@ flowchart TD
     EVAL --> OUT["評価の結果<br/>（集計の数字だけリポジトリへ）"]
 ```
 
+反映は 2 段に分ける。まず「計画を作る」で、書く内容に ID を付けて保存し、表示する。次に「その ID の計画だけを実行する」で書く。表示したあとに推定を作り直して書く、というずれを防げる。MCP から呼ぶときも、人が確かめた計画だけを書ける。
+
+書いたあとは、バックアップと書いたあとの DB を比べる。変わったのが対象の曲の `djmdCue`・`contentCue`・`djmdContent`（`CueUpdated`・USN・更新日時）だけか、全曲で `djmdCue` の行数と `contentCue` の要素数が一致するかを確かめる。外れたら、戻す手順を案内する。
+
 推定と反映は別のコマンドにする。推定は時間がかかるので Rekordbox を使いながら回せるようにし、反映は保存した推定結果を指定して、Rekordbox を終了してから短時間で済ませる。評価の M1〜M4 は、キューごとの的中率、全的中の曲の割合、要確認の精度と割合。
 
 ## 2. モジュールと依存の向き
@@ -50,13 +55,13 @@ flowchart TD
 | モジュール | 役割 | 外の道具 |
 |---|---|---|
 | `model` | モジュール間で受け渡すデータの形（3 章） | なし |
-| `library` | master.db のコピーを取り、プレイリスト・曲・既存のキュー・グリッド・フレーズを読んで `Track` にする | pyrekordbox |
+| `library` | master.db のコピーを取り、プレイリスト・曲・グリッド・フレーズを読んで `TrackInput` にする。既存のキューは別に読む | pyrekordbox |
 | `audio` | 音源を読み、分離し、拍ごとの音量を出して `Features` にする | ffmpeg、Demucs、numpy |
-| `estimate` | `Track` と `Features` から `Estimate` を作る。ルールベースと ML を差し替えられる | numpy だけ |
+| `estimate` | `TrackInput` と `Features` から `Estimate` を作る。ルールベースと ML を差し替えられる | numpy だけ |
 | `store` | 特徴量と推定結果を data フォルダに保存し、読み出す（N9） | なし |
 | `report` | 要確認の一覧をターミナルと CSV に出す | なし |
 | `evaluate` | 正解を取り出し、`Estimate` と比べて M1〜M4 を出す | なし |
-| `writer` | ADR 0001 の決めごとに沿って master.db に書く | pyrekordbox |
+| `writer` | 書く計画を作り、ID を指定されたら ADR 0001 の決めごとに沿って master.db に書く。書いたあとに確かめる | pyrekordbox |
 | `cli` | 上を組み合わせてコマンドにする。後で MCP サーバーも同じ組み合わせを呼ぶ | — |
 
 **決定：依存の向き。** `estimate` と `evaluate` は `model` だけに依存し、pyrekordbox や Demucs を知らない。こうすると次の利点がある。
@@ -70,7 +75,9 @@ TypeScript でいえば、`model` が共有の型定義、`library`・`audio`・
 
 型の名前と主な中身だけ決める。細かい項目はスプリントで足す。Python では `dataclass`（TypeScript の `readonly` な型に近い）で書く。
 
-### Track（library → audio・estimate・evaluate）
+### TrackInput（library → audio・estimate）
+
+推定に渡す曲の情報。**既存のキューは入れない。** 評価に使う曲では既存のキューが正解の元なので、推定に渡すと、ルールや ML の特徴量に正解が紛れ込むおそれがある。型で渡せないようにしておく。「既存のキューを変えても `Estimate` が変わらない」ことを確かめるテストも CI に置く。
 
 | 項目 | 内容 |
 |---|---|
@@ -79,8 +86,11 @@ TypeScript でいえば、`model` が共有の型定義、`library`・`audio`・
 | `path`・`file_type` | 音源の場所と形式（N10 の判定に使う） |
 | `beats` | グリッドの拍の列。各拍は「時刻（ms）」と「小節内の拍番号（1〜4）」 |
 | `phrases` | フレーズの列。各フレーズは「頭の拍の番号」と種類。曲の mood も持つ |
-| `existing_cues` | 既存のキュー（種類、パッド、時刻）。決定 11 と正解の取り出しに使う |
 | `fingerprint` | 音源（パス・大きさ・更新日時）とグリッドから作る値。変わったら保存済みの結果を使わない（N9） |
+
+### ExistingCues（library → evaluate・writer）
+
+曲ごとの既存のキュー（種類、パッド、時刻）。`evaluate` は正解の取り出しに、`writer` は決定 11（手動キューのある曲は飛ばす）に使う。`estimate` には渡さない。
 
 ### Features（audio → estimate）
 
@@ -93,7 +103,8 @@ TypeScript でいえば、`model` が共有の型定義、`library`・`audio`・
 
 | 項目 | 内容 |
 |---|---|
-| `track_id` | `Track.id` |
+| `track_id` | `TrackInput.id` |
+| `fingerprint` | 推定に使った `TrackInput.fingerprint`。書く直前に、今の音源とグリッドから作った値と比べる |
 | `cues` | 推定キューの列。各キューは「役割」「位置」「要確認の理由（なければ空）」 |
 | `track_review` | 曲全体の要確認の理由（形式が未確認、テンポが一定でない、など） |
 | `estimator` | 推定の名前と版（例：`rules-v1`）。評価の記録に残す |
@@ -108,7 +119,8 @@ TypeScript でいえば、`model` が共有の型定義、`library`・`audio`・
 - 拍の番号なら、必ず拍の頭に乗る。小節の 1 拍目かどうかも `beats` から分かる
 - 一覧に出す小節番号も、評価で比べる小節も、拍の番号から計算する
 - ms で持つと、テンポが一定でない曲や M4A の頭の無音（スパイク 4）で、グリッドとのずれが入り込む
-- 書く直前にグリッドが変わっていたら、拍の番号から ms に直せないので、その曲は書かずに「要確認」にする（ADR 0003）
+- 書く直前に解析ファイルの `PQTZ` を読み直し、`fingerprint` が推定のときと違えば（グリッドが直されていれば）、その曲は書かずに「要確認」にする（ADR 0003）。グリッドは master.db ではなく解析ファイルにあるので、DB の読み直しだけでは気づけない
+- ms への変換には、書く直前に読み直したグリッドを使う
 
 ## 4. 保存するもの（N9・N12・決定 13）
 
@@ -120,8 +132,10 @@ TypeScript でいえば、`model` が共有の型定義、`library`・`audio`・
 | 特徴量 | 曲ごと | JSON | 重い分離をやり直さずに済ませる。`fingerprint` と `version` が同じなら使い回す |
 | 推定結果 | 実行ごと（中は曲ごと） | JSON | 反映するときに指定する。途中で止まっても、終わった曲を飛ばして続けられる |
 | 要確認の一覧 | 実行ごと | CSV | S5。曲名入りなのでリポジトリの外 |
-| 評価の結果 | 評価ごと | JSON（集計だけリポジトリにも） | 前回と比べる（S1）。曲名入りの明細は外、集計の数字だけリポジトリに残す（D3） |
-| master.db のバックアップ | 書き込みごと | 3 ファイルのコピー | 直近 5 回分（N12） |
+| 評価データ b | 曲ごと | スプリントで決める | オーナーが確かめた正解。曲名入りなのでリポジトリの外 |
+| 評価の結果 | 評価ごと | JSON（集計だけリポジトリにも） | 前回と比べる（S1）。曲名入りの明細は外、集計の数字だけリポジトリに残す（D3）。推定の版に加えて、評価データの版（正解の取り出し方の版、b のファイルのハッシュ）と曲数も残す。どちらかが変わったら、前回とは比べられないと分かるようにする |
+| 書く計画 | 反映ごと | JSON | ID 付き。実行するときはこの ID を指定する |
+| master.db のバックアップ | 書き込みごと | `master.db`・`-wal`・`-shm` と `masterPlaylists6.xml` のコピー | 直近 5 回分（N12）。取った直後にコピーを開いて確かめる（ADR 0001） |
 
 JSON にするのは、中を目で見て確かめやすいため。拍ごとの音量は 1 曲あたり数百〜千個ほどの数で、JSON でも小さい。
 

@@ -7,7 +7,7 @@ Claude Code 向けのプロジェクト情報。開発の進め方と現在地�
 ## 1. 概要
 
 DJ 楽曲を音声解析し、Rekordbox の Memory Cue（必要に応じて Hot Cue）を自動生成するアプリ。
-オーナーは過去に約 1,000 曲へ手動でキューを設定しており、これを教師データ兼評価データとして活用する。
+オーナーは過去に約 1,500 曲へ手動でキューを設定しており、これを教師データ兼評価データとして活用する。
 
 ## 2. 背景と目的
 
@@ -47,7 +47,11 @@ MVP に含めるのはこのうち一部のみ（[docs/development-process.md](d
 - **評価方法を先に定義し、定量的に品質を測る。** 小さく動かして評価し、数値で改善を確認するサイクルを守る
 - 解決する課題を明確にし、技術選定の理由と設計上のトレードオフを記録する
 - 成果は GitHub で公開できる状態に保つ（README、再現手順、評価結果）
-- **ユーザーの Rekordbox ライブラリを壊さないこと。** master.db に書くときは [ADR 0001](docs/adr/0001-write-cues-to-master-db.md) の決めごとを守る（Rekordbox の終了を確かめる、書く前にバックアップ、Rekordbox と同じ形で `djmdCue`・`contentCue` をそろえて書く、対象の曲のキュー以外に触れない、書く内容を先に見せる）
+- **ユーザーの Rekordbox ライブラリを壊さないこと。** 読み書きでは次を守る。REVIEW.md（Sprint 0 で作る）にも同じ項目を入れる
+  - 書くときは [ADR 0001](docs/adr/0001-write-cues-to-master-db.md) の 5 つの決めごとを守る（Rekordbox と rekordboxAgent が止まっていて master.db を開いているプロセスがないことを確かめる、書く前にバックアップを取って確かめる、Rekordbox と同じ形で `djmdCue`・`contentCue` をそろえて書く、対象の曲のキュー以外に触れない、書く内容を先に見せる）
+  - 書く直前に、本物の master.db でキューを、解析ファイルでグリッドを読み直す（[ADR 0003](docs/adr/0003-read-library-from-db-copy.md)）
+  - 確かめた Rekordbox のバージョン・音源の形式にだけ書く（[requirements.md](docs/requirements.md) の N2・N10）
+  - 読むときは本物の master.db を開かず、コピーを開く（ADR 0003）
 - 音源ファイルや個人のライブラリデータ（エクスポート XML を含む）はリポジトリに含めない
 
 ## 6. 決定済みの技術方針
